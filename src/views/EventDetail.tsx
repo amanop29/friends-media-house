@@ -966,7 +966,7 @@ export function EventDetail({ slug }: { slug?: string }) {
 
         {/* Photo Grid - Masonry View */}
         {(mediaFilter === 'all' || mediaFilter === 'photos') && viewMode === 'masonry' && (
-          <Masonry columnsCount={density} gutter="0.75rem">
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(250px, 1fr))` }}>
             {isLoadingPhotos ? (
               <PhotoGridSkeleton density={density} />
             ) : (
@@ -1085,7 +1085,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                 </motion.div>
               ))
             )}
-          </Masonry>
+          </div>
         )}
 
         {/* Photo Grid - List View */}
