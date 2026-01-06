@@ -966,7 +966,17 @@ export function EventDetail({ slug }: { slug?: string }) {
 
         {/* Photo Grid - Masonry View */}
         {(mediaFilter === 'all' || mediaFilter === 'photos') && viewMode === 'masonry' && (
-          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(250px, 1fr))` }}>
+          <div 
+            className="w-full"
+            style={{
+              columnCount: density,
+              columnGap: '0.75rem',
+              columnFill: 'balance',
+              // Responsive columns
+              '@media (max-width: 640px)': { columnCount: 1 },
+              '@media (max-width: 1024px)': { columnCount: 2 },
+            } as any}
+          >
             {isLoadingPhotos ? (
               <PhotoGridSkeleton density={density} />
             ) : (
@@ -979,8 +989,10 @@ export function EventDetail({ slug }: { slug?: string }) {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
+                  style={{ breakInside: 'avoid' }}
+                  className="mb-3"
                 >
-                  <GlassCard className="overflow-hidden group relative">
+                  <GlassCard className="overflow-hidden group relative w-full">
                     <div
                       className="relative cursor-pointer"
                       onClick={() => {
