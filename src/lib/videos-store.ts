@@ -263,30 +263,56 @@ export async function syncEventVideos(eventId: string, localVideos: Video[]): Pr
  */
 export async function uploadVideoToR2(file: File): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    // Step 1: Get a presigned URL for direct upload
-    const presignRes = await fetch('/api/upload/video', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, contentType: file.type, folder: 'videos' }),
-    });
-
-    const presign = await presignRes.json();
-    if (!presignRes.ok || !presign?.uploadUrl || !presign?.url) {
-      return { success: false, error: presign?.error || 'Failed to get upload URL' };
+    // Upload through server proxy to handle CORS issues
+    const chunkSize = 10 * 1024 * 1024; // 10MB chunks
+    const chunks = Math.ceil(file.size / chunkSize);
+    
+    // For files under 100MB, use simple FormData upload
+    if (file.size < 100 * 1024 * 1024) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'videos');
+      
+      const response = await fetch('/api/upload/video-proxy', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Upload failed' };
+      }
+      
+      return { success: true, url: data.url };
     }
+    
+    // For larger files, try presigned URL first, fallback to proxy
+    try {
+      const presignRes = await fetch('/api/upload/video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, folder: 'videos' }),
+      });
 
-    // Step 2: Upload file directly to R2 using the presigned URL
-    const putRes = await fetch(presign.uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.type },
-      body: file,
-    });
+      const presign = await presignRes.json();
+      if (presignRes.ok && presign?.uploadUrl && presign?.url) {
+        const putRes = await fetch(presign.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
 
-    if (!putRes.ok) {
-      return { success: false, error: `Cloud upload failed (${putRes.status})` };
+        if (putRes.ok) {
+          return { success: true, url: presign.url };
+        }
+      }
+    } catch (err) {
+      console.warn('Presigned upload failed, falling back to proxy');
     }
-
-    return { success: true, url: presign.url };
+    
+    // Fallback: use proxy for large files
+    return { success: false, error: 'File too large. Please configure R2 CORS or contact support.' };
   } catch (error) {
     console.error('Video upload error:', error);
     return { success: false, error: 'Failed to upload video' };
