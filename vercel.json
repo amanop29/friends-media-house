@@ -48,7 +48,6 @@
     }
   ],
   "env": {
-    "NEXT_PUBLIC_APP_URL": "https://friendsmediahouse.com",
-    "NEXT_PUBLIC_ADMIN_URL": "https://admin.friendsmediahouse.com"
+    "NEXT_PUBLIC_APP_URL": "https://friendsmediahouse.com"
   }
 }
