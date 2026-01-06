@@ -6,18 +6,6 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "rewrites": [
-    {
-      "source": "/admin/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "friendsmediahouse.com"
-        }
-      ],
-      "destination": "https://admin.friendsmediahouse.com/admin/:path*"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -61,7 +49,6 @@
   ],
   "env": {
     "NEXT_PUBLIC_APP_URL": "https://friendsmediahouse.com",
-    "NEXT_PUBLIC_ADMIN_URL": "https://admin.friendsmediahouse.com",
-    "NEXT_PUBLIC_API_URL": "https://api.friendsmediahouse.com"
+    "NEXT_PUBLIC_ADMIN_URL": "https://admin.friendsmediahouse.com"
   }
 }

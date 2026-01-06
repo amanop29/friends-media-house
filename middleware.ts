@@ -8,37 +8,44 @@ export function middleware(request: NextRequest) {
   const isLocalhost = hostname === 'localhost' || 
                       hostname === '127.0.0.1' || 
                       hostname.startsWith('localhost:') ||
-                      hostname.startsWith('192.168.');
+                      hostname.startsWith('192.168.') ||
+                      hostname.includes('vercel.app'); // Also include Vercel preview URLs
 
   // Check if it's the admin subdomain
   const isAdminSubdomain = hostname.startsWith('admin.') || 
-                          hostname === 'admin.friendsmediahouse.com' ||
-                          hostname === 'localhost:3001';
+                          hostname === 'admin.friendsmediahouse.com';
 
-  // Skip middleware for login page to avoid redirect loops
-  if (pathname === '/admin/login') {
+  // Get the main domain (works for both custom domains and vercel.app)
+  const mainDomain = hostname.replace('admin.', '');
+
+  // Skip middleware for API routes to avoid redirect loops with API calls
+  if (pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
 
-  // Admin routes - require admin subdomain (only enforce on actual production domain)
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/upload')) {
-    // Only enforce subdomain routing on production domain, not localhost
-    if (!isAdminSubdomain && !isLocalhost) {
-      // Redirect to admin subdomain
-      const adminUrl = new URL(request.url);
-      adminUrl.hostname = `admin.${adminUrl.hostname}`;
-      return NextResponse.redirect(adminUrl);
-    }
+  // Skip middleware for static files and Next.js internals
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/static') ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|avif|woff|woff2)$/)
+  ) {
+    return NextResponse.next();
   }
 
-  // Public routes - should not be on admin subdomain (only on production)
-  if (isAdminSubdomain && !pathname.startsWith('/admin') && !pathname.startsWith('/api/admin') && !pathname.startsWith('/api/upload')) {
-    if (!isLocalhost) {
-      // Redirect to main domain
-      const mainUrl = new URL(request.url);
-      mainUrl.hostname = mainUrl.hostname.replace('admin.', '');
-      return NextResponse.redirect(mainUrl);
-    }
+  // ADMIN SUBDOMAIN ROUTING
+  // If accessing admin routes from main domain, redirect to admin subdomain
+  if (pathname.startsWith('/admin') && !isAdminSubdomain && !isLocalhost) {
+    const adminUrl = new URL(request.url);
+    adminUrl.hostname = `admin.${mainDomain}`;
+    return NextResponse.redirect(adminUrl, 308); // 308 Permanent Redirect
+  }
+
+  // PUBLIC DOMAIN ROUTING
+  // If accessing public routes from admin subdomain, redirect to main domain
+  if (!pathname.startsWith('/admin') && isAdminSubdomain && !isLocalhost) {
+    const mainUrl = new URL(request.url);
+    mainUrl.hostname = mainDomain;
+    return NextResponse.redirect(mainUrl, 308); // 308 Permanent Redirect
   }
 
   // Add security headers
