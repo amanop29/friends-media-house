@@ -33,6 +33,7 @@ export function AddEvent() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showNewCategoryDialog, setShowNewCategoryDialog] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
@@ -84,16 +85,24 @@ export function AddEvent() {
     }
 
     setIsUploading(true);
+    setLoadingMessage('Uploading cover image...');
+    const uploadToast = toast.loading('Uploading cover image...');
     
     try {
       // Upload cover image to R2
       const uploadResult = await uploadToR2(formData.coverImage, 'events');
       
       if (!uploadResult.success || !uploadResult.url) {
+        toast.dismiss(uploadToast);
         toast.error(uploadResult.error || 'Failed to upload cover image');
         setIsUploading(false);
+        setLoadingMessage('');
         return;
       }
+      
+      toast.dismiss(uploadToast);
+      setLoadingMessage('Creating event...');
+      toast.loading('Creating event in database...');
       
       // Create new event object with R2 URL (not base64)
       const baseSlug = generateSlug(formData.title);
@@ -114,33 +123,18 @@ export function AddEvent() {
         supabaseId: undefined,
       };
 
-      // Ensure category exists in Supabase and get its ID before creating event
-      let categoryId: string | null = null;
+      // Sync category in background (don't block event creation)
       if (supabase && formData.category) {
-        try {
-          // Upsert category first
-          await supabase
-            .from('categories')
-            .upsert({ 
-              slug: formData.category,
-              label: getCategoryDisplayName(formData.category),
-              is_default: isDefaultCategory(formData.category),
-              is_active: true
-            }, { onConflict: 'slug' });
-          
-          // Get category ID
-          const { data: catData } = await supabase
-            .from('categories')
-            .select('id')
-            .eq('slug', formData.category)
-            .single();
-          
-          if (catData?.id) {
-            categoryId = catData.id;
-          }
-        } catch (catErr) {
-          console.warn('Failed to sync category to Supabase:', catErr);
-        }
+        supabase
+          .from('categories')
+          .upsert({ 
+            slug: formData.category,
+            label: getCategoryDisplayName(formData.category),
+            is_default: isDefaultCategory(formData.category),
+            is_active: true
+          }, { onConflict: 'slug' })
+          .then(() => console.log('✅ Category synced'))
+          .catch((err) => console.warn('⚠️ Category sync failed:', err));
       }
 
       // Save to Supabase (best-effort) if configured
@@ -174,37 +168,35 @@ export function AddEvent() {
             is_featured: newEvent.isFeatured ?? false,
           };
           
-          console.log('📤 Attempting Supabase insert with data:', insertData);
-          
-          for (let attempt = 0; attempt < 2; attempt++) {
-            const { data, error } = await supabase
+          const { data, error } = await supabase
+            .from('events')
+            .insert(insertData)
+            .select('id, slug')
+            .single();
+
+          if (!error && data?.id) {
+            newEvent.supabaseId = data.id;
+            newEvent.slug = data.slug || uniqueSlug;
+            insertError = null;
+            console.log('✅ Event saved to Supabase with ID:', data.id);
+          } else if (error?.code === '23505') {
+            // Handle duplicate slug
+            uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+            insertData.slug = uniqueSlug;
+            const { data: retryData, error: retryError } = await supabase
               .from('events')
               .insert(insertData)
               .select('id, slug')
               .single();
-
-            console.log('📥 Supabase response:', { data, error });
-
-            if (!error && data?.id) {
-              newEvent.supabaseId = data.id;
-              newEvent.slug = data.slug || uniqueSlug;
+            if (!retryError && retryData?.id) {
+              newEvent.supabaseId = retryData.id;
+              newEvent.slug = retryData.slug || uniqueSlug;
               insertError = null;
-              console.log('✅ Event saved to Supabase with ID:', data.id);
-              toast.success('Event saved to database!');
-              break;
+            } else {
+              insertError = retryError;
             }
-
+          } else {
             insertError = error;
-
-            // Handle duplicate slug: regenerate and retry once
-            if (error?.code === '23505') {
-              uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
-              newEvent.slug = uniqueSlug;
-              continue;
-            }
-
-            // Other errors: stop
-            break;
           }
 
           if (insertError) {
@@ -236,6 +228,7 @@ export function AddEvent() {
       }
 
       toast.success('Event created successfully!');
+      setLoadingMessage('');
       
       // Clean up preview URL
       if (previewImage) {
@@ -514,7 +507,7 @@ export function AddEvent() {
                 {isUploading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Uploading...
+                    {loadingMessage || 'Creating...'}
                   </>
                 ) : (
                   <>
