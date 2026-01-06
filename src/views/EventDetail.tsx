@@ -18,9 +18,12 @@ import { toast } from 'sonner';
 import JSZip from 'jszip';
 
 // Dynamic import for react-responsive-masonry to avoid SSR issues
-const Masonry = dynamic(() => import('react-responsive-masonry').then(mod => mod.default), {
+const Masonry = dynamic(() => import('react-responsive-masonry').then(mod => mod.Masonry), {
   ssr: false,
   loading: () => <div className="grid grid-cols-2 md:grid-cols-4 gap-4"><PhotoGridSkeleton /></div>
+});
+const ResponsiveMasonry = dynamic(() => import('react-responsive-masonry').then(mod => mod.ResponsiveMasonry), {
+  ssr: false
 });
 
 export function EventDetail({ slug }: { slug?: string }) {
@@ -966,31 +969,33 @@ export function EventDetail({ slug }: { slug?: string }) {
 
         {/* Photo Grid - Masonry View */}
         {(mediaFilter === 'all' || mediaFilter === 'photos') && viewMode === 'masonry' && (
-          <Masonry columnsCount={density} gutter="1rem">
-            {isLoadingPhotos ? (
-              <PhotoGridSkeleton density={density} />
-            ) : (
-              filteredPhotos.map((photo, index) => (
-                <motion.div
-                  key={photo.id}
-                  ref={(el) => {
-                    if (el) photoRefsMap.current.set(photo.id, el);
-                  }}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                >
-                  <GlassCard className="overflow-hidden group relative">
-                    <div
-                      className="relative cursor-pointer"
-                      onClick={() => {
-                        if (selectionMode) {
-                          togglePhotoSelection(photo.id);
-                        } else {
-                          setLightboxPhoto(photo.url);
-                        }
-                      }}
-                    >
+          <ResponsiveMasonry columnsCountBreakPoints={{ 350: 1, 750: 2, 900: density }}>
+            <Masonry gutter="0.75rem">
+              {isLoadingPhotos ? (
+                <PhotoGridSkeleton density={density} />
+              ) : (
+                filteredPhotos.map((photo, index) => (
+                  <motion.div
+                    key={photo.id}
+                    ref={(el) => {
+                      if (el) photoRefsMap.current.set(photo.id, el);
+                    }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    className="mb-0"
+                  >
+                    <GlassCard className="overflow-hidden group relative h-full">
+                      <div
+                        className="relative cursor-pointer"
+                        onClick={() => {
+                          if (selectionMode) {
+                            togglePhotoSelection(photo.id);
+                          } else {
+                            setLightboxPhoto(photo.url);
+                          }
+                        }}
+                      >
                       {/* Image with skeleton overlay */}
                       {(() => {
                         const dims = photoDimensions.get(photo.id) || { width: photo.width || 4, height: photo.height || 3 };
@@ -1085,7 +1090,8 @@ export function EventDetail({ slug }: { slug?: string }) {
                 </motion.div>
               ))
             )}
-          </Masonry>
+            </Masonry>
+          </ResponsiveMasonry>
         )}
 
         {/* Photo Grid - List View */}
