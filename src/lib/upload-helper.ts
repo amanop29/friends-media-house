@@ -61,6 +61,7 @@ export async function uploadToR2(
     const response = await fetch(endpoint, {
       method: 'POST',
       body: formData,
+      signal: AbortSignal.timeout(60000), // 60 second timeout
     });
 
     const data = await response.json();
