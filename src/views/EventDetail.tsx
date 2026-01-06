@@ -586,19 +586,18 @@ export function EventDetail({ slug }: { slug?: string }) {
     try {
       // Use the proxy endpoint to avoid CORS issues - API converts to JPG
       const proxyUrl = `/api/download-image?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        cache: 'no-store', // Skip cache for fresh download
+      });
       if (!response.ok) throw new Error('Failed to fetch image');
       
-      // Get ArrayBuffer and create fresh blob - API returns JPG
-      const arrayBuffer = await response.arrayBuffer();
-      const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+      // Get ArrayBuffer and create blob in one go
+      const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       
       // Use provided filename or generate one with .jpg extension
-      let finalFilename = filename;
-      if (!finalFilename) {
-        finalFilename = `photo-${Date.now()}.jpg`;
-      }
+      let finalFilename = filename || `photo-${Date.now()}.jpg`;
       // Ensure .jpg extension
       if (!finalFilename.toLowerCase().endsWith('.jpg') && !finalFilename.toLowerCase().endsWith('.jpeg')) {
         finalFilename = finalFilename.replace(/\.[^/.]+$/, '') + '.jpg';
@@ -1177,7 +1176,15 @@ export function EventDetail({ slug }: { slug?: string }) {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => downloadImage(photo.url)}
+                              onClick={async () => {
+                                const loadingToast = toast.loading('Downloading image...');
+                                const success = await downloadImage(photo.url, `photo-${Date.now()}.jpg`);
+                                if (success) {
+                                  toast.success('Image downloaded!', { id: loadingToast });
+                                } else {
+                                  toast.error('Failed to download image', { id: loadingToast });
+                                }
+                              }}
                               className="rounded-full border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white"
                             >
                               <Download className="w-4 h-4" />
@@ -1406,7 +1413,15 @@ export function EventDetail({ slug }: { slug?: string }) {
               </button>
 
               <button
-                onClick={() => downloadImage(lightboxPhoto)}
+                onClick={async () => {
+                  const loadingToast = toast.loading('Downloading image...');
+                  const success = await downloadImage(lightboxPhoto, `photo-${Date.now()}.jpg`);
+                  if (success) {
+                    toast.success('Image downloaded!', { id: loadingToast });
+                  } else {
+                    toast.error('Failed to download image', { id: loadingToast });
+                  }
+                }}
                 className="w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
                 title="Download Image"
               >
