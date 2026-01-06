@@ -53,6 +53,7 @@ export function ManageGalleries() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState<{ [eventId: string]: UploadingPhoto[] }>({});
+    const [uploadProgress, setUploadProgress] = useState<{ [eventId: string]: { current: number; total: number } }>({});
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [photosVersion, setPhotosVersion] = useState(0); // Force re-render when photos change
@@ -414,21 +415,36 @@ export function ManageGalleries() {
     }
 
     try {
-      // Show uploading toast
-      toast.info(`Uploading ${photos.length} photo(s) to R2...`);
+      // Initialize progress tracking
+      setUploadProgress(prev => ({
+        ...prev,
+        [eventId]: { current: 0, total: photos.length }
+      }));
 
-      // Upload all photos to R2 first
-      const r2UploadResults = await Promise.all(
-        photos.map(async (photo) => {
-          try {
-            const result = await uploadToR2(photo.file, 'events');
-            return { id: photo.id, result };
-          } catch (err) {
-            console.error(`Failed to upload ${photo.file.name} to R2:`, err);
-            return { id: photo.id, result: { success: false, error: String(err) } };
-          }
-        })
-      );
+      const uploadToast = toast.loading(`Uploading 0/${photos.length} photos...`);
+
+      // Upload photos one by one to track progress
+      const r2UploadResults = [];
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        try {
+          const result = await uploadToR2(photo.file, 'events');
+          r2UploadResults.push({ id: photo.id, result });
+          
+          // Update progress
+          const current = i + 1;
+          setUploadProgress(prev => ({
+            ...prev,
+            [eventId]: { current, total: photos.length }
+          }));
+          toast.loading(`Uploading ${current}/${photos.length} photos...`, { id: uploadToast });
+        } catch (err) {
+          console.error(`Failed to upload ${photo.file.name} to R2:`, err);
+          r2UploadResults.push({ id: photo.id, result: { success: false, error: String(err) } });
+        }
+      }
+      
+      toast.dismiss(uploadToast);
 
       // Build photo objects with R2 URLs (not local previews)
       const newPhotos = r2UploadResults
@@ -467,11 +483,17 @@ export function ManageGalleries() {
       // Add photos to the store (also syncs to Supabase)
       await addPhotos(newPhotos);
 
-      // Clear uploading photos for this event
+      // Clear uploading photos and progress for this event
       setUploadingPhotos(prev => ({
         ...prev,
         [eventId]: []
       }));
+
+      setUploadProgress(prev => {
+        const newProg = { ...prev };
+        delete newProg[eventId];
+        return newProg;
+      });
 
       // Update the photos cache with new photos
       setEventPhotosCache(prev => ({
@@ -714,6 +736,30 @@ export function ManageGalleries() {
                                 />
                               </div>
                             </div>
+
+                            {/* Upload Progress */}
+                            {uploadProgress[event.id]?.total ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-[#707070] dark:text-[#A0A0A0]">
+                                    Uploading photos...
+                                  </span>
+                                  <span className="text-[#C5A572] font-medium">
+                                    {uploadProgress[event.id]?.current ?? 0} / {uploadProgress[event.id]?.total ?? 0}
+                                  </span>
+                                </div>
+                                <div className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{
+                                      width: `${Math.min(100, Math.round(((uploadProgress[event.id]?.current || 0) / (uploadProgress[event.id]?.total || 1)) * 100))}%`
+                                    }}
+                                    transition={{ duration: 0.3 }}
+                                    className="h-full bg-gradient-to-r from-[#C5A572] to-[#B39563]"
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
 
                             {/* Uploading Photos */}
                             {uploadPhotos.length > 0 && (

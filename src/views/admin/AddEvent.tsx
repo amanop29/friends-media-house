@@ -135,7 +135,7 @@ export function AddEvent() {
             is_active: true
           }, { onConflict: 'slug' })
           .then(() => console.log('✅ Category synced'))
-          .catch((err) => console.warn('⚠️ Category sync failed:', err));
+          .catch((err: unknown) => console.warn('⚠️ Category sync failed:', err));
       }
 
       // Save to Supabase (best-effort) if configured
