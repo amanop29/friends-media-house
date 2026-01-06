@@ -69,7 +69,7 @@ export function AdminSidebar() {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block w-64 h-screen sticky top-0 p-4 bg-[#FAFAFA] dark:bg-[#0F0F0F] border-r border-white/20 dark:border-white/10">
-        <GlassCard className="h-full flex flex-col p-6">
+        <div className="h-full flex flex-col p-6 rounded-xl border border-white/20 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl">
           {/* Logo */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
@@ -81,7 +81,7 @@ export function AdminSidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-2 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
@@ -105,7 +105,7 @@ export function AdminSidebar() {
           </nav>
 
           {/* Bottom Actions */}
-          <div className="space-y-2 pt-6 border-t border-white/20 dark:border-white/10">
+          <div className="space-y-2 pt-6 border-t border-white/20 dark:border-white/10 mt-4">
             {user && (
               <div className="px-4 py-2 mb-2">
                 <p className="text-xs text-gray-400">Logged in as</p>
@@ -121,7 +121,7 @@ export function AdminSidebar() {
               <span>Logout</span>
             </Button>
           </div>
-        </GlassCard>
+        </div>
       </div>
 
       {/* Mobile Sidebar Overlay */}
@@ -132,9 +132,9 @@ export function AdminSidebar() {
             onClick={() => setMobileMenuOpen(false)}
           />
           <div className="lg:hidden fixed top-16 left-0 bottom-0 w-64 z-50 p-4 bg-[#FAFAFA] dark:bg-[#0F0F0F] border-r border-white/20 dark:border-white/10 overflow-y-auto">
-            <GlassCard className="h-full flex flex-col p-6">
+            <div className="h-full flex flex-col p-6 rounded-xl border border-white/20 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl">
               {/* Navigation */}
-              <nav className="flex-1 space-y-2">
+              <nav className="flex-1 space-y-2 overflow-y-auto">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.path;
@@ -159,7 +159,7 @@ export function AdminSidebar() {
               </nav>
 
               {/* Bottom Actions */}
-              <div className="space-y-2 pt-6 border-t border-white/20 dark:border-white/10">
+              <div className="space-y-2 pt-6 border-t border-white/20 dark:border-white/10 mt-4">
                 {user && (
                   <div className="px-4 py-2 mb-2">
                     <p className="text-xs text-gray-400">Logged in as</p>
@@ -175,7 +175,7 @@ export function AdminSidebar() {
                   <span>Logout</span>
                 </Button>
               </div>
-            </GlassCard>
+            </div>
           </div>
         </>
       )}
