@@ -889,7 +889,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                         <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%]" style={{ animation: 'shimmer 1.5s infinite' }} />
                       )}
                       <ImageWithFallback
-                        src={photo.thumbnail}
+                        src={photo.url}
                         alt={`Photo ${photo.id}`}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         onLoad={() => {
@@ -1022,7 +1022,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                             )}
                             {/* Actual Image */}
                             <ImageWithFallback
-                              src={photo.thumbnail}
+                              src={photo.url}
                               alt={`Photo ${photo.id}`}
                               className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105 rounded-lg"
                               onLoad={() => {
@@ -1146,7 +1146,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                         }}
                       >
                         <ImageWithFallback
-                          src={photo.thumbnail}
+                          src={photo.url}
                           alt={`Photo ${photo.id}`}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
