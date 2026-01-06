@@ -15,24 +15,38 @@ export async function generateMetadata({ params }: Props) {
   
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://friendsmediahouse.com';
   
+  if (!event) {
+    return {
+      title: 'Event Not Found',
+      description: 'The requested event could not be found.',
+    };
+  }
+  
   return {
-    title: event ? event.title : 'Event',
-    description: event ? `View photos and details from ${event.title} - ${event.coupleNames}` : `View event photos and details`,
-    openGraph: event ? {
-      title: event.title,
-      description: `View photos and details from ${event.title} - ${event.coupleNames}`,
-      image: event.coverImage,
-      imageWidth: 1200,
-      imageHeight: 630,
+    title: `${event.title} - ${event.coupleNames}`,
+    description: `View photos and details from ${event.title} at ${event.location}. Captured by Friends Media House.`,
+    openGraph: {
+      title: `${event.title} - ${event.coupleNames}`,
+      description: `View photos and details from ${event.title} at ${event.location}`,
       url: `${baseUrl}/events/${slug}`,
+      siteName: 'Friends Media House',
+      images: [
+        {
+          url: event.coverImage,
+          width: 1200,
+          height: 630,
+          alt: `${event.title} - ${event.coupleNames}`,
+        },
+      ],
+      locale: 'en_US',
       type: 'website',
-    } : undefined,
-    twitter: event ? {
+    },
+    twitter: {
       card: 'summary_large_image',
-      title: event.title,
-      description: `View photos and details from ${event.title} - ${event.coupleNames}`,
-      image: event.coverImage,
-    } : undefined,
+      title: `${event.title} - ${event.coupleNames}`,
+      description: `View photos from ${event.title}`,
+      images: [event.coverImage],
+    },
   };
 }
 
