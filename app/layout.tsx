@@ -55,20 +55,23 @@ export const metadata: Metadata = {
     url: 'https://friendsmediahouse.com',
     siteName: 'Friends Media House',
     title: 'Friends Media House | Professional Event Photography & Videography',
-    description: 'Professional event photography and videography services.',
+    description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
     images: [
       {
         url: ogImage,
         width: 1200,
         height: 630,
         alt: 'Friends Media House',
+        type: 'image/jpeg',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Friends Media House',
-    description: 'Professional event photography and videography services.',
+    site: '@friendsmediahouse',
+    title: 'Friends Media House | Professional Event Photography & Videography',
+    description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
+    creator: '@friendsmediahouse',
     images: [ogImage],
   },
   robots: {

@@ -22,30 +22,38 @@ export async function generateMetadata({ params }: Props) {
     };
   }
   
+  const eventUrl = `${baseUrl}/events/${slug}`;
+  const eventTitle = `${event.title} - ${event.coupleNames}`;
+  const eventDescription = `View photos and details from ${event.title} at ${event.location}. Captured by Friends Media House.`;
+  const coverImage = event.coverImage || `${baseUrl}/og-image.jpg`;
+  
   return {
-    title: `${event.title} - ${event.coupleNames}`,
-    description: `View photos and details from ${event.title} at ${event.location}. Captured by Friends Media House.`,
+    title: eventTitle,
+    description: eventDescription,
     openGraph: {
-      title: `${event.title} - ${event.coupleNames}`,
-      description: `View photos and details from ${event.title} at ${event.location}`,
-      url: `${baseUrl}/events/${slug}`,
+      type: 'website',
+      title: eventTitle,
+      description: eventDescription,
+      url: eventUrl,
       siteName: 'Friends Media House',
       images: [
         {
-          url: event.coverImage,
+          url: coverImage,
           width: 1200,
           height: 630,
-          alt: `${event.title} - ${event.coupleNames}`,
+          alt: eventTitle,
+          type: 'image/jpeg',
         },
       ],
       locale: 'en_US',
-      type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${event.title} - ${event.coupleNames}`,
-      description: `View photos from ${event.title}`,
-      images: [event.coverImage],
+      site: '@friendsmediahouse',
+      title: eventTitle,
+      description: eventDescription,
+      creator: '@friendsmediahouse',
+      images: [coverImage],
     },
   };
 }
