@@ -50,6 +50,8 @@
     "next": "^15.1.4",
     "next-themes": "^0.4.6",
     "plaiceholder": "^3.0.0",
+    "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -73,10 +75,10 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/react-router-dom": "^5.3.3",
-    "autoprefixer": "^10.4.20",
+    
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.1.4",
-    "postcss": "^8.4.49",
+    
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"
   },
