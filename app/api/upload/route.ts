@@ -89,38 +89,43 @@ export async function POST(request: NextRequest) {
     const width = metadata.width || 0;
     const height = metadata.height || 0;
 
-    // Optimize and upload original image
-    const optimizedBuffer = await sharp(buffer)
-      .resize(2400, 2400, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 85 })
-      .toBuffer();
+    // Process images in parallel for faster upload
+    const [optimizedBuffer, thumbnailBuffer, blurBuffer] = await Promise.all([
+      // Optimize original image
+      sharp(buffer)
+        .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer(),
+      
+      // Generate thumbnail
+      sharp(buffer)
+        .resize(300, 300, { fit: 'cover' })
+        .webp({ quality: 65 })
+        .toBuffer(),
+      
+      // Generate blur placeholder
+      sharp(buffer)
+        .resize(10, 10, { fit: 'cover' })
+        .blur(2)
+        .webp({ quality: 10 })
+        .toBuffer()
+    ]);
 
-    const uploadResult = await uploadToR2(
-      optimizedBuffer,
-      file.name.replace(/\.[^/.]+$/, '.webp'),
-      'image/webp',
-      folder as any
-    );
-
-    // Generate and upload thumbnail
-    const thumbnailBuffer = await sharp(buffer)
-      .resize(400, 400, { fit: 'cover' })
-      .webp({ quality: 70 })
-      .toBuffer();
-
-    const thumbnailResult = await uploadToR2(
-      thumbnailBuffer,
-      `thumb-${file.name.replace(/\.[^/.]+$/, '.webp')}`,
-      'image/webp',
-      folder as any
-    );
-
-    // Generate blur placeholder
-    const blurBuffer = await sharp(buffer)
-      .resize(20, 20, { fit: 'cover' })
-      .blur()
-      .webp({ quality: 20 })
-      .toBuffer();
+    // Upload images in parallel
+    const [uploadResult, thumbnailResult] = await Promise.all([
+      uploadToR2(
+        optimizedBuffer,
+        file.name.replace(/\.[^/.]+$/, '.webp'),
+        'image/webp',
+        folder as any
+      ),
+      uploadToR2(
+        thumbnailBuffer,
+        `thumb-${file.name.replace(/\.[^/.]+$/, '.webp')}`,
+        'image/webp',
+        folder as any
+      )
+    ]);
 
     const blurDataUrl = `data:image/webp;base64,${blurBuffer.toString('base64')}`;
 
