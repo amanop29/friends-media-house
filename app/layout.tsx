@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { Toaster } from '@/components/ui/sonner';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 import { getSettings } from '@/lib/settings';
 import '@/styles/globals.css';
 
@@ -101,6 +102,7 @@ export default function RootLayout({
           {children}
           <Toaster position="top-center" richColors />
           <SpeedInsights />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
