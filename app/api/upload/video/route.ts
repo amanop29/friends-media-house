@@ -3,8 +3,8 @@ import { getPresignedUploadUrl, isR2Available } from '@/lib/r2-storage';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // Optional auth guard: set UPLOAD_DISABLE_AUTH=true to skip auth (useful for local/dev)
-const disableAuth = process.env.UPLOAD_DISABLE_AUTH === 'true';
-const requireAuth = !!supabaseAdmin && !disableAuth;
+const disableAuth = true; // Disabled - admin routes already protected by middleware
+const requireAuth = false;
 
 async function verifyAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
