@@ -45,4 +45,4 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   return <>{children}</>;
 }
 
-export default ProtectedRoute;export default ProtectedRoute;
+export default ProtectedRoute;
