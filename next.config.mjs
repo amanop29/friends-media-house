@@ -41,9 +41,9 @@ const nextConfig = {
   },
   // Enable React Server Components
   reactStrictMode: true,
-  // Temporarily ignore type errors in build
+  // TypeScript configuration - set to false before production
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: true, // TODO: Fix TypeScript errors and set to false
   },
   // Configure experimental features
   experimental: {
