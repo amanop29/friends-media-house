@@ -263,33 +263,32 @@ export async function syncEventVideos(eventId: string, localVideos: Video[]): Pr
  */
 export async function uploadVideoToR2(file: File): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', 'videos');
-
-    const response = await fetch('/api/upload/video', {
+    // Step 1: Get a presigned URL for direct upload
+    const presignRes = await fetch('/api/upload/video', {
       method: 'POST',
-      body: formData,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, contentType: file.type, folder: 'videos' }),
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.error || 'Upload failed',
-      };
+    const presign = await presignRes.json();
+    if (!presignRes.ok || !presign?.uploadUrl || !presign?.url) {
+      return { success: false, error: presign?.error || 'Failed to get upload URL' };
     }
 
-    return {
-      success: true,
-      url: data.url,
-    };
+    // Step 2: Upload file directly to R2 using the presigned URL
+    const putRes = await fetch(presign.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+
+    if (!putRes.ok) {
+      return { success: false, error: `Cloud upload failed (${putRes.status})` };
+    }
+
+    return { success: true, url: presign.url };
   } catch (error) {
     console.error('Video upload error:', error);
-    return {
-      success: false,
-      error: 'Failed to upload video',
-    };
+    return { success: false, error: 'Failed to upload video' };
   }
 }
