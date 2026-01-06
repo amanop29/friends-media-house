@@ -152,8 +152,9 @@ export function AddEvent() {
             'events': 'event',
             'film': 'film',
             'films': 'film',
+            'jainism': 'jainism',
           };
-          const mappedCategory = categoryMap[newEvent.category?.toLowerCase()] || 'other';
+          const mappedCategory = categoryMap[newEvent.category?.toLowerCase()] || newEvent.category?.toLowerCase() || 'event';
           
           // Prepare insert data
           const insertData = {
