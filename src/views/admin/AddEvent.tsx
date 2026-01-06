@@ -87,6 +87,7 @@ export function AddEvent() {
     setIsUploading(true);
     setLoadingMessage('Uploading cover image...');
     const uploadToast = toast.loading('Uploading cover image...');
+    let createToast: string | number | undefined;
     
     try {
       // Upload cover image to R2
@@ -102,7 +103,7 @@ export function AddEvent() {
       
       toast.dismiss(uploadToast);
       setLoadingMessage('Creating event...');
-      toast.loading('Creating event in database...');
+      createToast = toast.loading('Creating event in database...');
       
       // Create new event object with R2 URL (not base64)
       const baseSlug = generateSlug(formData.title);
@@ -227,6 +228,7 @@ export function AddEvent() {
         console.warn('Failed to log activity:', logErr);
       }
 
+      toast.dismiss(createToast);
       toast.success('Event created successfully!');
       setLoadingMessage('');
       
@@ -248,9 +250,11 @@ export function AddEvent() {
       setPreviewImage(null);
     } catch (error) {
       console.error('Error creating event:', error);
+      if (createToast) toast.dismiss(createToast);
       toast.error('Failed to create event');
     } finally {
       setIsUploading(false);
+      setLoadingMessage('');
     }
   };
 
