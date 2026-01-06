@@ -49,11 +49,43 @@ export async function uploadToR2(
   folder: 'banners' | 'logos' | 'avatars' | 'events' | 'gallery' | 'reviews' | 'videos' | 'team' = 'gallery'
 ): Promise<UploadResult> {
   try {
+    // For large files (>4MB), use presigned URL to avoid 413 errors
+    const fourMB = 4 * 1024 * 1024;
+    if (file.size > fourMB) {
+      // Get presigned URL
+      const endpoint = ['banners', 'logos', 'avatars', 'reviews', 'team'].includes(folder)
+        ? '/api/upload/public'
+        : '/api/upload';
+      
+      const presignRes = await fetch(
+        `${endpoint}?fileName=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}&folder=${folder}`,
+        { method: 'GET' }
+      );
+      
+      const presign = await presignRes.json();
+      if (!presignRes.ok || !presign?.uploadUrl) {
+        return { success: false, error: presign?.error || 'Failed to get upload URL' };
+      }
+
+      // Upload directly to R2
+      const putRes = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+
+      if (!putRes.ok) {
+        return { success: false, error: `Upload failed (${putRes.status})` };
+      }
+
+      return { success: true, url: presign.url, thumbnailUrl: presign.url };
+    }
+
+    // For smaller files, use FormData with Sharp processing
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
 
-    // Use public endpoint for certain folders, admin endpoint for others
     const endpoint = ['banners', 'logos', 'avatars', 'reviews', 'team'].includes(folder)
       ? '/api/upload/public'
       : '/api/upload';
@@ -61,7 +93,7 @@ export async function uploadToR2(
     const response = await fetch(endpoint, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(60000), // 60 second timeout
+      signal: AbortSignal.timeout(60000),
     });
 
     const data = await response.json();

@@ -34,7 +34,58 @@ async function verifyAdmin(request: NextRequest) {
   return user;
 }
 
-// POST /api/upload - Upload image to R2
+// GET /api/upload - Get presigned URL for direct upload (bypasses body size limits)
+export async function GET(request: NextRequest) {
+  if (!isR2Available()) {
+    return NextResponse.json(
+      { error: 'Cloud storage is not configured.' },
+      { status: 503 }
+    );
+  }
+
+  if (requireAuth) {
+    const user = await verifyAdmin(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const fileName = searchParams.get('fileName');
+    const contentType = searchParams.get('contentType');
+    const folder = searchParams.get('folder') || 'gallery';
+
+    if (!fileName || !contentType) {
+      return NextResponse.json(
+        { error: 'fileName and contentType are required' },
+        { status: 400 }
+      );
+    }
+
+    const { getPresignedUploadUrl } = await import('@/lib/r2-storage');
+    const { uploadUrl, key, publicUrl } = await getPresignedUploadUrl(
+      fileName,
+      contentType,
+      folder as any
+    );
+
+    return NextResponse.json({
+      success: true,
+      uploadUrl,
+      key,
+      url: publicUrl,
+    });
+  } catch (error) {
+    console.error('Presign error:', error);
+    return NextResponse.json(
+      { error: 'Failed to create upload URL' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/upload - Upload image to R2 with Sharp processing
 export async function POST(request: NextRequest) {
   // Check if R2 is configured first
   if (!isR2Available()) {

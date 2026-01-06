@@ -1,5 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadToR2, isR2Available } from '@/lib/r2-storage';
+import { uploadToR2, isR2Available, getPresignedUploadUrl } from '@/lib/r2-storage';
+
+// GET /api/upload/public - Get presigned URL for public uploads
+export async function GET(request: NextRequest) {
+  try {
+    if (!isR2Available()) {
+      return NextResponse.json(
+        { error: 'Cloud storage is not configured.' },
+        { status: 503 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const fileName = searchParams.get('fileName');
+    const contentType = searchParams.get('contentType');
+    const folder = searchParams.get('folder') || 'general';
+
+    if (!fileName || !contentType) {
+      return NextResponse.json(
+        { error: 'fileName and contentType are required' },
+        { status: 400 }
+      );
+    }
+
+    const allowedFolders = ['banners', 'logos', 'avatars', 'reviews', 'team'];
+    if (!allowedFolders.includes(folder)) {
+      return NextResponse.json(
+        { error: 'Invalid folder specified' },
+        { status: 400 }
+      );
+    }
+
+    const { uploadUrl, key, publicUrl } = await getPresignedUploadUrl(
+      fileName,
+      contentType,
+      folder as any
+    );
+
+    return NextResponse.json({
+      success: true,
+      uploadUrl,
+      key,
+      url: publicUrl,
+    });
+  } catch (error) {
+    console.error('Presign error:', error);
+    return NextResponse.json(
+      { error: 'Failed to create upload URL' },
+      { status: 500 }
+    );
+  }
+}
 
 // POST /api/upload/public - Public upload endpoint for avatars, logos, banners
 export async function POST(request: NextRequest) {
