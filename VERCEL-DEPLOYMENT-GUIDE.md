@@ -40,6 +40,45 @@ Before deploying to Vercel, ensure you have:
 
 ## Environment Variables Setup
 
+### 🚀 Automated Setup (Recommended)
+
+**The easiest way to manage environment variables is using Vercel CLI:**
+
+#### Step 1: Install Vercel CLI
+```bash
+npm install -g vercel
+```
+
+#### Step 2: Login to Vercel
+```bash
+vercel login
+```
+
+#### Step 3: Link Your Project
+```bash
+vercel link
+```
+This will link your local project to your Vercel project.
+
+#### Step 4: Pull Environment Variables
+```bash
+vercel env pull
+```
+
+This automatically creates a `.env` file with all environment variables from your Vercel project!
+
+**Benefits:**
+- ✅ No manual copying of environment variables
+- ✅ Always in sync with Vercel project
+- ✅ Works for Development, Preview, and Production environments
+- ✅ Easy to update: just run `vercel env pull` again
+
+---
+
+### 📝 Manual Setup (Alternative)
+
+**If you prefer to add environment variables manually in Vercel dashboard:**
+
 ### Required Environment Variables
 
 You'll need to add these in Vercel dashboard. Here's the complete list:
@@ -110,6 +149,64 @@ ADMIN_EMAIL=admin@friendsmediahouse.com
 ---
 
 ## Deploy to Vercel
+
+### 🚀 Option A: Deploy via CLI (Recommended)
+
+**Fastest and easiest method:**
+
+#### Step 1: Install Vercel CLI (if not done already)
+```bash
+npm install -g vercel
+```
+
+#### Step 2: Login to Vercel
+```bash
+vercel login
+```
+Follow the prompts to authenticate.
+
+#### Step 3: Deploy
+```bash
+vercel
+```
+
+The CLI will:
+- Ask if you want to link to existing project or create new
+- Ask for project settings (use defaults)
+- Deploy your project
+- Provide deployment URL
+
+#### Step 4: Add Environment Variables via CLI
+
+You can add environment variables directly from CLI:
+
+```bash
+# Add a single variable
+vercel env add NEXT_PUBLIC_SUPABASE_URL
+
+# You'll be prompted to enter the value and select environments
+```
+
+Or add all at once by creating a `.env` file and running:
+```bash
+vercel env add < .env.example
+```
+
+Then pull them locally:
+```bash
+vercel env pull
+```
+
+#### Step 5: Deploy to Production
+```bash
+vercel --prod
+```
+
+---
+
+### 📱 Option B: Deploy via Dashboard
+
+**If you prefer the web interface:**
 
 ### Step 1: Create Vercel Account
 
