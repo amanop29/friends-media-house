@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
   PlusCircle, 
-  Upload, 
   FolderOpen, 
   Star, 
   Settings,
@@ -37,7 +36,6 @@ export function AdminSidebar() {
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Add Event', path: '/admin/add-event', icon: PlusCircle },
-    { name: 'Upload Media', path: '/admin/upload', icon: Upload },
     { name: 'Manage Galleries', path: '/admin/galleries', icon: FolderOpen },
     { name: 'Leads', path: '/admin/leads', icon: Users },
     { name: 'Comments', path: '/admin/comments', icon: MessageCircle },
