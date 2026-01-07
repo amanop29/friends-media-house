@@ -1,11 +1,12 @@
 "use client";
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from "framer-motion";
 import { Camera, Film, Heart, Award, ArrowRight } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/button';
-import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { OptimizedImage } from '../components/OptimizedImage';
 import { getEvents } from '../lib/events-store';
 import { getSettings, fetchSettings, type SiteSettings } from '../lib/settings';
 import { supabase } from '../lib/supabase';
@@ -28,13 +29,20 @@ interface FeaturedEvent {
 
 export function Home() {
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const [bannerImage, setBannerImage] = useState<string>('');
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com';
+  const fallbackBanner = '/og-image.jpg';
+  const [bannerImage, setBannerImage] = useState<string>(fallbackBanner);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [featuredEvents, setFeaturedEvents] = useState<FeaturedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [events, setEvents] = useState<any[]>([]);
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
+
+  const toAbsoluteUrl = (url?: string) => {
+    if (!url) return fallbackBanner;
+    if (url.startsWith('http')) return url;
+    return `${siteUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
   useEffect(() => {
     // Load settings from localStorage first for immediate render
@@ -43,7 +51,7 @@ export function Home() {
     
     // Set banner from local settings first
     if (localSettings.homeBannerUrl) {
-      setBannerImage(localSettings.homeBannerUrl);
+      setBannerImage(toAbsoluteUrl(localSettings.homeBannerUrl));
     }
     
     // Then fetch from Supabase to get latest
@@ -51,7 +59,7 @@ export function Home() {
       setSettings(supabaseSettings);
       // Update banner from Supabase settings
       if (supabaseSettings.homeBannerUrl) {
-        setBannerImage(supabaseSettings.homeBannerUrl);
+          setBannerImage(toAbsoluteUrl(supabaseSettings.homeBannerUrl));
       }
     });
 
@@ -127,7 +135,7 @@ export function Home() {
       setSettings(event.detail);
       // Also update banner when settings are updated
       if (event.detail.homeBannerUrl) {
-        setBannerImage(event.detail.homeBannerUrl);
+        setBannerImage(toAbsoluteUrl(event.detail.homeBannerUrl));
       }
     };
 
@@ -196,12 +204,15 @@ export function Home() {
       <section className="relative h-screen flex items-center justify-center overflow-hidden pt-20">
         {/* Background Image */}
         <div className="absolute inset-0">
-          <ImageWithFallback
-            src={bannerImage}
-            alt="Hero"
-            className="w-full h-full object-cover"
-            eager
+          <Image
+            src={bannerImage || fallbackBanner}
+            alt="Hero banner"
+            fill
+            priority
             fetchPriority="high"
+            sizes="100vw"
+            quality={85}
+            className="object-cover"
           />
           {/* Gradient overlay - fades from dark at top to page background at bottom */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-[#FAFAFA] dark:to-[#0F0F0F]" />
@@ -282,14 +293,12 @@ export function Home() {
                   <Link href={`/events/${event.slug || event.id}`}>
                     <GlassCard hover className="overflow-hidden group">
                       <div className="relative h-80 overflow-hidden">
-                        {!loadedImages.has(event.id) && (
-                          <div className="absolute inset-0 z-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer bg-[length:200%_100%]" />
-                        )}
-                        <ImageWithFallback
-                          src={event.coverImage}
+                        <OptimizedImage
+                          src={toAbsoluteUrl(event.coverImage)}
                           alt={event.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          onLoad={() => setLoadedImages(prev => new Set(prev).add(event.id))}
+                          fill
+                          className="object-cover group-hover:scale-110 transition-transform duration-500"
+                          sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-6">
                           <h3 className="text-white mb-2">{event.title}</h3>
