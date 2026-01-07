@@ -1351,11 +1351,16 @@ export function EventDetail({ slug }: { slug?: string }) {
                 </div>
                 
                 <div className="mb-6">
-                  <div className="aspect-video rounded-lg overflow-hidden">
+                  <div className="rounded-lg overflow-hidden">
                     <ImageWithFallback
-                      src={eventPhotos.find(p => p.id === selectedPhotoForComments)?.thumbnail || ''}
+                      src={
+                        eventPhotos.find(p => p.id === selectedPhotoForComments)?.url ||
+                        eventPhotos.find(p => p.id === selectedPhotoForComments)?.thumbnail ||
+                        ''
+                      }
                       alt="Selected photo"
-                      className="w-full h-full object-cover"
+                      className="w-full h-auto max-h-[60vh] object-contain"
+                      eager
                     />
                   </div>
                 </div>

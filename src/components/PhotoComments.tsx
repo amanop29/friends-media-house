@@ -378,6 +378,14 @@ export function PhotoComments({ photoId, photoUrl, eventTitle, onCommentAdded }:
               // Try to parse as JSON (icon + color)
               try {
                 const parsed = JSON.parse(comment.avatar);
+                // Hide deprecated Sparkles icon by using a User fallback
+                if (parsed.icon === 'Sparkles') {
+                  return (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-white" />
+                    </div>
+                  );
+                }
                 if (parsed.icon) {
                   const IconComponent = (LucideIcons as any)[parsed.icon];
                   if (IconComponent) {

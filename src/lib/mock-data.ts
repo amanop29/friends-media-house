@@ -133,10 +133,9 @@ export const defaultAvatars: AvatarOption[] = [
   { id: 'avatar-2', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Heart' },
   { id: 'avatar-3', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Smile' },
   { id: 'avatar-4', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Star' },
-  { id: 'avatar-5', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Sparkles' },
-  { id: 'avatar-6', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Camera' },
-  { id: 'avatar-7', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Music' },
-  { id: 'avatar-8', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Flower2' },
+  { id: 'avatar-5', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Camera' },
+  { id: 'avatar-6', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Music' },
+  { id: 'avatar-7', gradient: 'from-[#C5A572] to-[#8B7355]', icon: 'Flower2' },
 ];
 
 // Event Categories - centralized and dynamic

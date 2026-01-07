@@ -153,6 +153,10 @@ export function ManageComments() {
       }
       // Otherwise try to parse as JSON (icon + color)
       const parsed = JSON.parse(avatarStr);
+      // Hide deprecated Sparkles icon by falling back to initials
+      if (parsed.icon === 'Sparkles') {
+        return { type: 'initials', color: parsed.color || '#C5A572' };
+      }
       return { type: 'icon', icon: parsed.icon, color: parsed.color };
     } catch {
       return { type: 'initials', color: '#C5A572' };

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Film, Heart, Award, Users, Sparkles, Eye, Clock, CheckCircle } from 'lucide-react';
+import { Camera, Film, Heart, Award, Users, Lightbulb, Eye, Clock, CheckCircle, Zap } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
@@ -28,7 +28,7 @@ export function AboutUs() {
       color: 'from-blue-500 to-purple-600',
     },
     {
-      icon: Sparkles,
+      icon: Lightbulb,
       title: 'Innovation',
       description: 'Using cutting-edge AI technology and creative techniques to capture magic.',
       color: 'from-green-500 to-teal-600',
@@ -459,7 +459,7 @@ export function AboutUs() {
               <div className="space-y-4">
                 {[
                   { icon: Eye, text: 'Advanced Face Detection' },
-                  { icon: Sparkles, text: 'Instant Photo Retrieval' },
+                  { icon: Zap, text: 'Instant Photo Retrieval' },
                   { icon: Clock, text: 'Same-Day Delivery' },
                 ].map((feature, index) => {
                   const Icon = feature.icon;

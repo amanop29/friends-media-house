@@ -64,7 +64,9 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-950">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto p-6">
+      <main
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-6 pt-[calc(4rem+env(safe-area-inset-top))] lg:pt-6"
+      >
         {children}
       </main>
     </div>

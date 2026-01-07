@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -24,6 +24,28 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navDesktopRef = useRef<HTMLDivElement | null>(null);
+  const navMobileRef = useRef<HTMLDivElement | null>(null);
+
+  // Ensure mobile overlay never persists on large viewports
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setMobileMenuOpen(false);
+    };
+
+    // Close on first render if already large (defensive for hydration edge cases)
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      setMobileMenuOpen(false);
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close menu on route change to avoid stale overlays
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   const handleLogout = () => {
     logout();
@@ -67,7 +89,7 @@ export function AdminSidebar() {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block w-64 h-screen sticky top-0 p-4 bg-[#FAFAFA] dark:bg-[#0F0F0F] border-r border-white/20 dark:border-white/10">
-        <div className="h-full flex flex-col p-6 rounded-xl border border-white/20 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl">
+        <div className="h-full flex flex-col p-6 rounded-xl border border-white/20 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl relative min-h-0">
           {/* Logo */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
@@ -79,7 +101,7 @@ export function AdminSidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-2 overflow-y-auto">
+          <nav ref={navDesktopRef} className="flex-1 min-h-0 space-y-2 overflow-y-auto sidebar-scroll pr-1 pb-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
@@ -119,6 +141,7 @@ export function AdminSidebar() {
               <span>Logout</span>
             </Button>
           </div>
+          
         </div>
       </div>
 
@@ -129,10 +152,10 @@ export function AdminSidebar() {
             className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="lg:hidden fixed top-16 left-0 bottom-0 w-64 z-50 p-4 bg-[#FAFAFA] dark:bg-[#0F0F0F] border-r border-white/20 dark:border-white/10 overflow-y-auto">
-            <div className="h-full flex flex-col p-6 rounded-xl border border-white/20 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl">
+          <div className="lg:hidden fixed top-16 left-0 bottom-0 w-64 z-50 p-4 bg-[#FAFAFA] dark:bg-[#0F0F0F] border-r border-white/20 dark:border-white/10 overflow-y-hidden">
+            <div className="h-full min-h-0 flex flex-col p-6 rounded-xl border border-white/20 dark:border-white/10 bg-white/50 dark:bg-black/20 backdrop-blur-xl relative">
               {/* Navigation */}
-              <nav className="flex-1 space-y-2 overflow-y-auto">
+              <nav ref={navMobileRef} className="flex-1 min-h-0 space-y-2 overflow-y-auto sidebar-scroll pr-1 pb-20">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.path;
@@ -173,6 +196,7 @@ export function AdminSidebar() {
                   <span>Logout</span>
                 </Button>
               </div>
+              
             </div>
           </div>
         </>

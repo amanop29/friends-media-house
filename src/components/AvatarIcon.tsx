@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Heart, Smile, Star, Sparkles, Camera, Music, Flower2 } from 'lucide-react';
+import { User, Heart, Smile, Star, Camera, Music, Flower2 } from 'lucide-react';
 import { AvatarOption } from '../lib/mock-data';
 
 interface AvatarIconProps {
@@ -13,7 +13,6 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Heart,
   Smile,
   Star,
-  Sparkles,
   Camera,
   Music,
   Flower2,
