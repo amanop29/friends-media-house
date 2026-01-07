@@ -23,48 +23,36 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.co
 
 // Get OG image from Supabase settings (server-side)
 async function getOGImage(): Promise<string> {
-  // Default R2 bucket image - use this directly
-  const defaultR2Image = 'https://media.friendsmediahouse.com/home-banner.jpg';
-  
   if (!supabaseAdmin) {
-    console.log('OG Image: No supabaseAdmin, using default R2 image');
-    return defaultR2Image;
+    throw new Error('Supabase admin not configured');
   }
 
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('settings')
-      .select('value')
-      .eq('key', 'site_config')
-      .single();
+  const { data, error } = await supabaseAdmin
+    .from('settings')
+    .select('value')
+    .eq('key', 'site_config')
+    .single();
 
-    if (error) {
-      console.log('OG Image: Supabase error:', error.message, '- using default R2 image');
-      return defaultR2Image;
-    }
+  if (error) {
+    throw new Error(`Failed to fetch settings: ${error.message}`);
+  }
 
-    if (!data) {
-      console.log('OG Image: No data from Supabase - using default R2 image');
-      return defaultR2Image;
-    }
+  if (!data) {
+    throw new Error('No settings data found in database');
+  }
 
-    const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-    
-    if (settings.homeBannerUrl) {
-      console.log('OG Image: Using homeBannerUrl from Supabase:', settings.homeBannerUrl);
-      // Ensure absolute URL
-      if (settings.homeBannerUrl.startsWith('http')) {
-        return settings.homeBannerUrl;
-      }
-      return `${siteUrl}${settings.homeBannerUrl.startsWith('/') ? '' : '/'}${settings.homeBannerUrl}`;
-    }
-    
-    console.log('OG Image: No homeBannerUrl in settings - using default R2 image');
-  } catch (error) {
-    console.warn('OG Image: Exception:', error);
+  const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+  
+  if (!settings.homeBannerUrl) {
+    throw new Error('homeBannerUrl not found in settings');
+  }
+
+  // Ensure absolute URL
+  if (settings.homeBannerUrl.startsWith('http')) {
+    return settings.homeBannerUrl;
   }
   
-  return defaultR2Image;
+  return `${siteUrl}${settings.homeBannerUrl.startsWith('/') ? '' : '/'}${settings.homeBannerUrl}`;
 }
 
 // Generate metadata dynamically to fetch OG image from Supabase

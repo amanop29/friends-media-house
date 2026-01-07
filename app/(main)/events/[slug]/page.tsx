@@ -31,9 +31,9 @@ export async function generateMetadata({ params }: Props) {
   if (coverImage && !coverImage.startsWith('http')) {
     coverImage = `${baseUrl}${coverImage.startsWith('/') ? '' : '/'}${coverImage}`;
   }
-  // Default to R2 home banner if no cover image
+  
   if (!coverImage) {
-    coverImage = 'https://media.friendsmediahouse.com/home-banner.jpg';
+    throw new Error(`No cover image found for event: ${event.title}`);
   }
   
   return {
