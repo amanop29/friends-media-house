@@ -4,7 +4,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { Toaster } from '@/components/ui/sonner';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import '@/styles/globals.css';
 
 const inter = Inter({ 
@@ -23,11 +23,14 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.co
 
 // Get OG image from Supabase settings (server-side)
 async function getOGImage(): Promise<string> {
-  if (!supabaseAdmin) {
-    throw new Error('Supabase admin not configured');
+  // Prefer service role, but allow public client so metadata works without the service key
+  const client = supabaseAdmin ?? supabase;
+
+  if (!client || typeof client.from !== 'function') {
+    throw new Error('Supabase client not configured');
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await client
     .from('settings')
     .select('value')
     .eq('key', 'site_config')
@@ -42,7 +45,7 @@ async function getOGImage(): Promise<string> {
   }
 
   const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-  
+
   if (!settings.homeBannerUrl) {
     throw new Error('homeBannerUrl not found in settings');
   }
@@ -51,14 +54,20 @@ async function getOGImage(): Promise<string> {
   if (settings.homeBannerUrl.startsWith('http')) {
     return settings.homeBannerUrl;
   }
-  
+
   return `${siteUrl}${settings.homeBannerUrl.startsWith('/') ? '' : '/'}${settings.homeBannerUrl}`;
 }
 
 // Generate metadata dynamically to fetch OG image from Supabase
 export async function generateMetadata(): Promise<Metadata> {
-  const ogImage = await getOGImage();
-  
+  let ogImage: string | undefined;
+
+  try {
+    ogImage = await getOGImage();
+  } catch (error) {
+    console.warn('OG Image: failed to load from Supabase', error);
+  }
+
   return {
     metadataBase: new URL(siteUrl),
     title: {
@@ -82,16 +91,18 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: 'Friends Media House',
       title: 'Friends Media House | Professional Event Photography & Videography',
       description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
-      images: [
-        {
-          url: ogImage,
-          width: 1200,
-          height: 630,
-          alt: 'Friends Media House - Professional Event Photography & Videography',
-          type: 'image/jpeg',
-          secureUrl: ogImage,
-        },
-      ],
+      images: ogImage
+        ? [
+            {
+              url: ogImage,
+              width: 1200,
+              height: 630,
+              alt: 'Friends Media House - Professional Event Photography & Videography',
+              type: 'image/jpeg',
+              secureUrl: ogImage,
+            },
+          ]
+        : [],
     },
     twitter: {
       card: 'summary_large_image',
@@ -99,12 +110,14 @@ export async function generateMetadata(): Promise<Metadata> {
       title: 'Friends Media House | Professional Event Photography & Videography',
       description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
       creator: '@friendsmediahouse',
-      images: {
-        url: ogImage,
-        width: 1200,
-        height: 630,
-        alt: 'Friends Media House - Professional Event Photography & Videography',
-      },
+      images: ogImage
+        ? {
+            url: ogImage,
+            width: 1200,
+            height: 630,
+            alt: 'Friends Media House - Professional Event Photography & Videography',
+          }
+        : undefined,
     },
     robots: {
       index: true,
