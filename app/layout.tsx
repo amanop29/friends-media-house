@@ -24,7 +24,7 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.co
 // Get OG image from Supabase settings (server-side)
 async function getOGImage(): Promise<string> {
   // Default R2 bucket image - use this directly
-  const defaultR2Image = 'https://pub-a73c1c40a04f4b35ace922519c4fcfcd.r2.dev/home-banner.jpg';
+  const defaultR2Image = 'https://media.friendsmediahouse.com/home-banner.jpg';
   
   if (!supabaseAdmin) {
     console.log('OG Image: No supabaseAdmin, using default R2 image');
