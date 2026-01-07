@@ -1,5 +1,5 @@
 import { EventDetail } from '@/views/EventDetail';
-import { getEvents } from '@/lib/events-store';
+import { getEventsFromSupabase } from '@/lib/events-store';
 
 interface Props {
   params: Promise<{
@@ -8,12 +8,12 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props) {
-  // Fetch event data for metadata
+  // Fetch event data from Supabase for metadata
   const { slug } = await params;
-  const events = getEvents();
+  const events = await getEventsFromSupabase();
   const event = events.find(e => e.slug === slug || e.id === slug);
   
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://friendsmediahouse.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com';
   
   if (!event) {
     return {
@@ -23,9 +23,18 @@ export async function generateMetadata({ params }: Props) {
   }
   
   const eventUrl = `${baseUrl}/events/${slug}`;
-  const eventTitle = `${event.title} - ${event.coupleNames}`;
+  const eventTitle = `${event.title}${event.coupleNames ? ' - ' + event.coupleNames : ''}`;
   const eventDescription = `View photos and details from ${event.title} at ${event.location}. Captured by Friends Media House.`;
-  const coverImage = event.coverImage || `${baseUrl}/og-image.jpg`;
+  
+  // Ensure cover image is an absolute URL
+  let coverImage = event.coverImage;
+  if (coverImage && !coverImage.startsWith('http')) {
+    coverImage = `${baseUrl}${coverImage.startsWith('/') ? '' : '/'}${coverImage}`;
+  }
+  // Default to R2 home banner if no cover image
+  if (!coverImage) {
+    coverImage = 'https://media.friendsmediahouse.com/home-banner.jpg';
+  }
   
   return {
     title: eventTitle,
@@ -43,6 +52,7 @@ export async function generateMetadata({ params }: Props) {
           height: 630,
           alt: eventTitle,
           type: 'image/jpeg',
+          secureUrl: coverImage,
         },
       ],
       locale: 'en_US',
@@ -53,7 +63,12 @@ export async function generateMetadata({ params }: Props) {
       title: eventTitle,
       description: eventDescription,
       creator: '@friendsmediahouse',
-      images: [coverImage],
+      images: {
+        url: coverImage,
+        width: 1200,
+        height: 630,
+        alt: eventTitle,
+      },
     },
   };
 }
