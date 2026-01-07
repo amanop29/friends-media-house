@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Calendar, MapPin, Image as ImageIcon, Video } from 'lucide-react';
 import { motion } from "framer-motion";
 import { GlassCard } from './GlassCard';
@@ -16,6 +17,8 @@ export function EventCard({ event }: EventCardProps) {
   const [photoCount, setPhotoCount] = useState(event.photoCount || 0);
   const [videoCount, setVideoCount] = useState(event.videoCount || 0);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const router = useRouter();
+  const href = `/events/${event.slug || event.id}`;
 
   useEffect(() => {
     // Use counts from event object if available (from Supabase)
@@ -38,7 +41,13 @@ export function EventCard({ event }: EventCardProps) {
   }, [event.id, event.photoCount, event.videoCount, event.videos, event.videoUrl]);
 
   return (
-    <Link href={`/events/${event.slug || event.id}`}>
+    <Link
+      href={href}
+      prefetch
+      onMouseEnter={() => router.prefetch(href)}
+      onFocus={() => router.prefetch(href)}
+      onTouchStart={() => router.prefetch(href)}
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -17,6 +17,16 @@ import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
 
+type DownloadJobStatus = 'pending' | 'running' | 'success' | 'error';
+
+type DownloadJob = {
+  id: string;
+  label: string;
+  progress: number;
+  status: DownloadJobStatus;
+  message?: string;
+};
+
 // Dynamic import for react-responsive-masonry to avoid SSR issues
 const Masonry = dynamic(() => import('react-responsive-masonry').then(mod => mod.default), {
   ssr: false,
@@ -43,6 +53,69 @@ export function EventDetail({ slug }: { slug?: string }) {
   const photoRefsMap = useRef<Map<string, HTMLElement>>(new Map());
   const [imageLoadingStates, setImageLoadingStates] = useState<Map<string, boolean>>(new Map());
   const [photoDimensions, setPhotoDimensions] = useState<Map<string, { width: number; height: number }>>(new Map());
+  const [downloadQueue, setDownloadQueue] = useState<DownloadJob[]>([]);
+
+  const runDownloadJob = (label: string, task: (progress: (value: number) => void) => Promise<void>) => {
+    const id = crypto.randomUUID();
+    setDownloadQueue((prev) => [...prev, { id, label, progress: 0, status: 'pending' }]);
+
+    // Defer execution so the queue UI can paint before heavy work starts
+    requestAnimationFrame(async () => {
+      const updateProgress = (value: number) => {
+        const clamped = Math.max(0, Math.min(100, Math.round(value)));
+        setDownloadQueue((prev) => prev.map((job) => job.id === id ? { ...job, progress: clamped } : job));
+      };
+
+      try {
+        setDownloadQueue((prev) => prev.map((job) => job.id === id ? { ...job, status: 'running' } : job));
+        await task(updateProgress);
+        setDownloadQueue((prev) => prev.map((job) => job.id === id ? { ...job, progress: 100, status: 'success' } : job));
+        setTimeout(() => {
+          setDownloadQueue((prev) => prev.filter((job) => job.id !== id));
+        }, 3200);
+      } catch (error: any) {
+        const message = error instanceof Error ? error.message : 'Download failed';
+        setDownloadQueue((prev) => prev.map((job) => job.id === id ? { ...job, status: 'error', message } : job));
+      }
+    });
+  };
+
+  const downloadBlobWithProgress = async (
+    proxyUrl: string,
+    fallbackType: string,
+    onProgress?: (value: number) => void,
+  ) => {
+    const response = await fetch(proxyUrl, { method: 'GET', cache: 'no-store' });
+    if (!response.ok) throw new Error('Failed to fetch file');
+
+    // If the stream API is unavailable, fall back to blob()
+    if (!response.body) {
+      const blob = await response.blob();
+      onProgress?.(100);
+      return blob;
+    }
+
+    const reader = response.body.getReader();
+    const contentLength = Number(response.headers.get('Content-Length')) || 0;
+    const chunks: BlobPart[] = [];
+    let received = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value.buffer.slice(0));
+        received += value.length;
+        if (contentLength) {
+          onProgress?.(Math.min(99, (received / contentLength) * 100));
+        }
+      }
+    }
+
+    onProgress?.(100);
+    const type = response.headers.get('Content-Type') || fallbackType;
+    return new Blob(chunks as Uint8Array[], { type });
+  };
 
   // Helper function to load image dimensions dynamically
   const loadImageDimensions = (photo: Photo) => {
@@ -487,81 +560,58 @@ export function EventDetail({ slug }: { slug?: string }) {
     toast.info('Selection cleared');
   };
 
-  const downloadSelectedPhotos = async () => {
+  const downloadSelectedPhotos = () => {
     if (selectedPhotos.size === 0) {
       toast.error('Please select photos to download');
       return;
     }
 
-    const photosToDownload = eventPhotos.filter(p => selectedPhotos.has(p.id));
+    const photosToDownload = eventPhotos.filter((p) => selectedPhotos.has(p.id));
     
-    // If only one photo, download directly
+    // If only one photo, queue a single download
     if (photosToDownload.length === 1) {
-      const loadingToast = toast.loading('Downloading photo...');
-      // Use generic JPG filename since API converts to JPG
       const filename = `photo-${Date.now()}.jpg`;
-      const success = await downloadImage(photosToDownload[0].url, filename);
-      if (success) {
-        toast.success('Photo downloaded!', { id: loadingToast });
-      } else {
-        toast.error('Failed to download photo', { id: loadingToast });
-      }
+      runDownloadJob('Downloading photo', async (progress) => {
+        await downloadImage(photosToDownload[0].url, filename, progress);
+      });
       setSelectionMode(false);
       setSelectedPhotos(new Set());
       return;
     }
 
-    // For multiple photos, create a ZIP file
-    const loadingToast = toast.loading(`Preparing ${selectedPhotos.size} photos for download...`);
-    
-    try {
+    runDownloadJob(`Downloading ${selectedPhotos.size} photos`, async (progress) => {
       const zip = new JSZip();
       const folder = zip.folder(event?.title || 'photos');
-      
       if (!folder) throw new Error('Failed to create folder');
 
-      // Fetch all images and add to zip with generic names in JPG format
       for (let i = 0; i < photosToDownload.length; i++) {
         const photo = photosToDownload[i];
-        try {
-          toast.loading(`Processing ${i + 1}/${photosToDownload.length}...`, { id: loadingToast });
-          // Use proxy endpoint to avoid CORS issues
-          const proxyUrl = `/api/download-image?url=${encodeURIComponent(photo.url)}`;
-          const response = await fetch(proxyUrl);
-          if (!response.ok) throw new Error(`Failed to fetch image ${i + 1}`);
-          
-          // Get ArrayBuffer and create fresh blob
-          const arrayBuffer = await response.arrayBuffer();
-          const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
-          // Always use JPG format with generic names: img-1.jpg, img-2.jpg, etc.
-          const filename = `img-${i + 1}.jpg`;
-          folder.file(filename, blob);
-        } catch (error) {
-          console.error(`Failed to add photo ${i + 1}:`, error);
-        }
+        const proxyUrl = `/api/download-image?url=${encodeURIComponent(photo.url)}`;
+
+        const blob = await downloadBlobWithProgress(proxyUrl, 'image/jpeg', (value) => {
+          const perPhotoShare = 90 / photosToDownload.length;
+          progress(Math.min(90, i * perPhotoShare + (value / 100) * perPhotoShare));
+        });
+
+        const filename = `img-${i + 1}.jpg`;
+        folder.file(filename, blob);
       }
 
-      // Generate and download zip
-      toast.loading('Creating ZIP file...', { id: loadingToast });
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipBlob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+        progress(Math.min(100, 90 + (metadata.percent * 0.1)));
+      });
+
       const zipUrl = URL.createObjectURL(zipBlob);
-      
       const link = document.createElement('a');
       link.href = zipUrl;
       link.download = `${event?.title || 'photos'}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
       setTimeout(() => URL.revokeObjectURL(zipUrl), 100);
-      
-      toast.success(`Downloaded ${photosToDownload.length} photos!`, { id: loadingToast });
-    } catch (error) {
-      console.error('Failed to create ZIP:', error);
-      toast.error('Failed to download photos', { id: loadingToast });
-    }
+      progress(100);
+    });
     
-    // Exit selection mode after download
     setSelectionMode(false);
     setSelectedPhotos(new Set());
   };
@@ -582,41 +632,35 @@ export function EventDetail({ slug }: { slug?: string }) {
     }
   };
 
-  const downloadImage = async (url: string, filename?: string) => {
-    try {
-      // Use the proxy endpoint to avoid CORS issues - API converts to JPG
-      const proxyUrl = `/api/download-image?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
-        cache: 'no-store', // Skip cache for fresh download
-      });
-      if (!response.ok) throw new Error('Failed to fetch image');
-      
-      // Get ArrayBuffer and create blob in one go
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      
-      // Use provided filename or generate one with .jpg extension
-      let finalFilename = filename || `photo-${Date.now()}.jpg`;
-      // Ensure .jpg extension
-      if (!finalFilename.toLowerCase().endsWith('.jpg') && !finalFilename.toLowerCase().endsWith('.jpeg')) {
-        finalFilename = finalFilename.replace(/\.[^/.]+$/, '') + '.jpg';
-      }
-      
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = finalFilename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      return true;
-    } catch (error) {
-      console.error('Download failed:', error);
-      return false;
+  const downloadImage = async (url: string, filename?: string, onProgress?: (value: number) => void) => {
+    // Use the proxy endpoint to avoid CORS issues - API converts to JPG
+    const proxyUrl = `/api/download-image?url=${encodeURIComponent(url)}`;
+    const blob = await downloadBlobWithProgress(proxyUrl, 'image/jpeg', onProgress);
+    const blobUrl = URL.createObjectURL(blob);
+    
+    // Use provided filename or generate one with .jpg extension
+    let finalFilename = filename || `photo-${Date.now()}.jpg`;
+    // Ensure .jpg extension
+    if (!finalFilename.toLowerCase().endsWith('.jpg') && !finalFilename.toLowerCase().endsWith('.jpeg')) {
+      finalFilename = finalFilename.replace(/\.[^/.]+$/, '') + '.jpg';
     }
+    
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = finalFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    onProgress?.(100);
+  };
+
+  const queueSingleImageDownload = (url: string, filename?: string) => {
+    runDownloadJob('Downloading photo', async (progress) => {
+      await downloadImage(url, filename, progress);
+    });
   };
 
   const shareAlbum = async () => {
@@ -972,9 +1016,6 @@ export function EventDetail({ slug }: { slug?: string }) {
               columnCount: density,
               columnGap: '0.75rem',
               columnFill: 'balance',
-              // Responsive columns
-              '@media (max-width: 640px)': { columnCount: 1 },
-              '@media (max-width: 1024px)': { columnCount: 2 },
             } as any}
           >
             {isLoadingPhotos ? (
@@ -1188,15 +1229,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={async () => {
-                                const loadingToast = toast.loading('Downloading image...');
-                                const success = await downloadImage(photo.url, `photo-${Date.now()}.jpg`);
-                                if (success) {
-                                  toast.success('Image downloaded!', { id: loadingToast });
-                                } else {
-                                  toast.error('Failed to download image', { id: loadingToast });
-                                }
-                              }}
+                              onClick={() => queueSingleImageDownload(photo.url, `photo-${Date.now()}.jpg`)}
                               className="rounded-full border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white"
                             >
                               <Download className="w-4 h-4" />
@@ -1269,15 +1302,10 @@ export function EventDetail({ slug }: { slug?: string }) {
                     <p className="text-[#2B2B2B] dark:text-white">{video.title || 'Video'}</p>
                     {video.type !== 'youtube' && (
                       <button
-                        onClick={async () => {
-                          const loadingToast = toast.loading('Downloading video...');
-                          try {
-                            // Use proxy endpoint to avoid CORS issues
+                        onClick={() => {
+                          runDownloadJob('Downloading video', async (progress) => {
                             const proxyUrl = `/api/download-video?url=${encodeURIComponent(video.url)}`;
-                            const response = await fetch(proxyUrl);
-                            if (!response.ok) throw new Error('Failed to fetch video');
-                            const arrayBuffer = await response.arrayBuffer();
-                            const blob = new Blob([arrayBuffer], { type: 'video/mp4' });
+                            const blob = await downloadBlobWithProgress(proxyUrl, 'video/mp4', progress);
                             const blobUrl = URL.createObjectURL(blob);
                             const link = document.createElement('a');
                             link.href = blobUrl;
@@ -1289,11 +1317,8 @@ export function EventDetail({ slug }: { slug?: string }) {
                             link.click();
                             document.body.removeChild(link);
                             setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-                            toast.success('Video downloaded!', { id: loadingToast });
-                          } catch (error) {
-                            console.error('Video download failed:', error);
-                            toast.error('Failed to download video', { id: loadingToast });
-                          }
+                            progress(100);
+                          });
                         }}
                         className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
                         title="Download Video"
@@ -1321,6 +1346,48 @@ export function EventDetail({ slug }: { slug?: string }) {
               )}
             </div>
           </motion.div>
+        )}
+
+        {/* Download queue HUD */}
+        {downloadQueue.length > 0 && (
+          <div className="fixed bottom-4 right-4 z-50 space-y-3 w-[280px]">
+            {downloadQueue.map((job) => (
+              <div
+                key={job.id}
+                className="rounded-xl bg-white dark:bg-black/80 shadow-lg border border-black/5 dark:border-white/10 p-3"
+              >
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-sm font-medium text-[#1A1A1A] dark:text-white line-clamp-1">{job.label}</span>
+                  <span
+                    className={`text-xs ${
+                      job.status === 'success'
+                        ? 'text-green-600'
+                        : job.status === 'error'
+                        ? 'text-red-500'
+                        : 'text-[#707070] dark:text-[#A0A0A0]'
+                    }`}
+                  >
+                    {job.status === 'success'
+                      ? 'Done'
+                      : job.status === 'error'
+                      ? 'Failed'
+                      : `${Math.min(100, Math.max(0, Math.round(job.progress)))}%`}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-150 ${
+                      job.status === 'error' ? 'bg-red-500' : 'bg-[#C5A572]'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(0, job.progress || (job.status === 'error' ? 100 : 0)))}%` }}
+                  />
+                </div>
+                {job.message && (
+                  <p className="mt-2 text-xs text-red-500">{job.message}</p>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Photo Comments Modal */}
@@ -1430,15 +1497,7 @@ export function EventDetail({ slug }: { slug?: string }) {
               </button>
 
               <button
-                onClick={async () => {
-                  const loadingToast = toast.loading('Downloading image...');
-                  const success = await downloadImage(lightboxPhoto, `photo-${Date.now()}.jpg`);
-                  if (success) {
-                    toast.success('Image downloaded!', { id: loadingToast });
-                  } else {
-                    toast.error('Failed to download image', { id: loadingToast });
-                  }
-                }}
+                onClick={() => queueSingleImageDownload(lightboxPhoto, `photo-${Date.now()}.jpg`)}
                 className="w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
                 title="Download Image"
               >

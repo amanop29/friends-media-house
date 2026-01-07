@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from "framer-motion";
 import { Camera, Film, Heart, Award, ArrowRight } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
@@ -35,6 +36,7 @@ export function Home() {
   const [events, setEvents] = useState<any[]>([]);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     // Load settings from localStorage first for immediate render
@@ -279,7 +281,13 @@ export function Home() {
                   transition={{ duration: 0.4, delay: index * 0.1 }}
                   className={index >= 3 && !showAllEvents ? 'hidden md:block' : ''}
                 >
-                  <Link href={`/events/${event.slug || event.id}`}>
+                  <Link
+                    href={`/events/${event.slug || event.id}`}
+                    prefetch
+                    onMouseEnter={() => router.prefetch(`/events/${event.slug || event.id}`)}
+                    onFocus={() => router.prefetch(`/events/${event.slug || event.id}`)}
+                    onTouchStart={() => router.prefetch(`/events/${event.slug || event.id}`)}
+                  >
                     <GlassCard hover className="overflow-hidden group">
                       <div className="relative h-80 overflow-hidden">
                         {!loadedImages.has(event.id) && (
