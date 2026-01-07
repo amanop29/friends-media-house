@@ -18,23 +18,30 @@ const playfair = Playfair_Display({
   variable: '--font-playfair',
 });
 
+// Base URL for absolute paths
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com';
+
 // Get default OG image - will use home banner if available
-function getOGImage() {
+function getOGImage(): string {
   try {
     const settings = getSettings();
     if (settings.homeBannerUrl) {
-      return settings.homeBannerUrl;
+      // Ensure absolute URL
+      if (settings.homeBannerUrl.startsWith('http')) {
+        return settings.homeBannerUrl;
+      }
+      return `${siteUrl}${settings.homeBannerUrl.startsWith('/') ? '' : '/'}${settings.homeBannerUrl}`;
     }
   } catch (error) {
     console.warn('Could not load settings for OG image:', error);
   }
-  return '/og-image.jpg';
+  return `${siteUrl}/og-image.jpg`;
 }
 
 const ogImage = getOGImage();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com'),
+  metadataBase: new URL(siteUrl),
   title: {
     default: 'Friends Media House | Professional Event Photography & Videography',
     template: '%s | Friends Media House',
@@ -52,7 +59,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://friendsmediahouse.com',
+    url: siteUrl,
     siteName: 'Friends Media House',
     title: 'Friends Media House | Professional Event Photography & Videography',
     description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
@@ -61,8 +68,9 @@ export const metadata: Metadata = {
         url: ogImage,
         width: 1200,
         height: 630,
-        alt: 'Friends Media House',
+        alt: 'Friends Media House - Professional Event Photography & Videography',
         type: 'image/jpeg',
+        secureUrl: ogImage,
       },
     ],
   },
@@ -72,7 +80,12 @@ export const metadata: Metadata = {
     title: 'Friends Media House | Professional Event Photography & Videography',
     description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
     creator: '@friendsmediahouse',
-    images: [ogImage],
+    images: {
+      url: ogImage,
+      width: 1200,
+      height: 630,
+      alt: 'Friends Media House - Professional Event Photography & Videography',
+    },
   },
   robots: {
     index: true,
