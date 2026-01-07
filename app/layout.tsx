@@ -4,7 +4,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { Toaster } from '@/components/ui/sonner';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
-import { getSettings } from '@/lib/settings';
+import { supabaseAdmin } from '@/lib/supabase';
 import '@/styles/globals.css';
 
 const inter = Inter({ 
@@ -21,10 +21,28 @@ const playfair = Playfair_Display({
 // Base URL for absolute paths
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com';
 
-// Get default OG image - will use home banner if available
-function getOGImage(): string {
+// Get OG image from Supabase settings (server-side)
+async function getOGImage(): Promise<string> {
+  // Fallback image
+  const fallbackImage = `${siteUrl}/og-image.jpg`;
+  
+  if (!supabaseAdmin) {
+    return fallbackImage;
+  }
+
   try {
-    const settings = getSettings();
+    const { data, error } = await supabaseAdmin
+      .from('settings')
+      .select('value')
+      .eq('key', 'site_config')
+      .single();
+
+    if (error || !data) {
+      return fallbackImage;
+    }
+
+    const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+    
     if (settings.homeBannerUrl) {
       // Ensure absolute URL
       if (settings.homeBannerUrl.startsWith('http')) {
@@ -35,10 +53,11 @@ function getOGImage(): string {
   } catch (error) {
     console.warn('Could not load settings for OG image:', error);
   }
-  return `${siteUrl}/og-image.jpg`;
+  
+  return fallbackImage;
 }
 
-const ogImage = getOGImage();
+const ogImage = await getOGImage();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
