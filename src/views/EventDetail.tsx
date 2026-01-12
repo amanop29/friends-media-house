@@ -1350,7 +1350,7 @@ export function EventDetail({ slug }: { slug?: string }) {
 
         {/* Download queue HUD */}
         {downloadQueue.length > 0 && (
-          <div className="fixed bottom-4 right-4 z-50 space-y-3 w-[280px]">
+          <div className="fixed bottom-4 left-4 z-50 space-y-3 w-[280px]">
             {downloadQueue.map((job) => (
               <div
                 key={job.id}
