@@ -222,7 +222,7 @@ export function EventDetail({ slug }: { slug?: string }) {
               description: data.description,
               date: data.date,
               location: data.location,
-              category: data.category,
+              category: data.custom_category || data.category, // Use custom category if available
               coverImage: data.cover_image || data.cover_image_url,
               coupleNames: data.couple_names,
               photoCount: data.photo_count || 0,

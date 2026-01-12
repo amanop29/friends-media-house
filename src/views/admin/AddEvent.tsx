@@ -144,17 +144,29 @@ export function AddEvent() {
           let insertError: any = null;
           
           // Map category to valid event_type enum values
+          // Valid enum values: 'wedding', 'pre-wedding', 'engagement', 'reception', 
+          // 'jainism', 'birthday', 'corporate', 'event', 'film', 'other'
           const categoryMap: Record<string, string> = {
             'wedding': 'wedding',
             'pre-wedding': 'pre-wedding',
             'prewedding': 'pre-wedding',
+            'engagement': 'engagement',
+            'reception': 'reception',
+            'jainism': 'jainism',
+            'birthday': 'birthday',
+            'corporate': 'corporate',
             'event': 'event',
             'events': 'event',
             'film': 'film',
             'films': 'film',
-            'jainism': 'jainism',
           };
-          const mappedCategory = categoryMap[newEvent.category?.toLowerCase()] || newEvent.category?.toLowerCase() || 'event';
+          
+          // Use mapped category or default to 'other' for custom categories
+          const normalizedCategory = newEvent.category?.toLowerCase() || 'event';
+          const mappedCategory = categoryMap[normalizedCategory] || 'other';
+          
+          // Determine if this is a custom category (not in the standard enum)
+          const isCustomCategory = !categoryMap[normalizedCategory];
           
           // Prepare insert data
           const insertData = {
@@ -165,6 +177,7 @@ export function AddEvent() {
             date: newEvent.date || new Date().toISOString().split('T')[0],
             location: newEvent.location || '',
             category: mappedCategory,
+            custom_category: isCustomCategory ? normalizedCategory : null, // Store custom category name
             cover_image_url: newEvent.coverImage,
             is_visible: newEvent.isVisible ?? true,
             is_featured: newEvent.isFeatured ?? false,
@@ -264,7 +277,13 @@ export function AddEvent() {
 
     const success = addCategory(newCategoryName);
     if (success) {
-      const normalizedCategoryName = newCategoryName.trim().toLowerCase();
+      // Get the normalized category name (same normalization as in addCategory)
+      const normalizedCategoryName = newCategoryName
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
       // Refresh from Supabase to ensure table gets the new category if possible
       const fresh = await fetchCategories();
       setCategories(fresh);
@@ -386,7 +405,8 @@ export function AddEvent() {
                           <div
                             className="flex-1 flex items-center gap-2 text-sm text-gray-900 dark:text-white"
                             onClick={() => {
-                              setFormData({ ...formData, category });
+                              // Ensure category is properly normalized when selected
+                              setFormData({ ...formData, category: category.toLowerCase() });
                               setCategoryDropdownOpen(false);
                             }}
                           >

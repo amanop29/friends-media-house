@@ -35,21 +35,26 @@ export function Gallery() {
           
           if (!error && data && data.length > 0) {
             console.log('✅ Gallery: Got', data.length, 'events from Supabase');
-            loadedEvents = data.map((event: any) => ({
-              id: event.id,
-              title: event.title,
-              slug: event.slug,
-              description: event.description,
-              date: event.date,
-              location: event.location,
-              category: event.category,
-              coverImage: event.cover_image || event.cover_image_url,
-              coupleNames: event.couple_names,
-              photoCount: event.photo_count || 0,
-              videoCount: event.video_count || 0,
-              isFeatured: event.is_featured,
-              isVisible: event.is_visible,
-            }));
+            loadedEvents = data.map((event: any) => {
+              // Use custom_category from Supabase if available, otherwise use category enum
+              const actualCategory = event.custom_category || event.category;
+              
+              return {
+                id: event.id,
+                title: event.title,
+                slug: event.slug,
+                description: event.description,
+                date: event.date,
+                location: event.location,
+                category: actualCategory, // Use custom category if available
+                coverImage: event.cover_image || event.cover_image_url,
+                coupleNames: event.couple_names,
+                photoCount: event.photo_count || 0,
+                videoCount: event.video_count || 0,
+                isFeatured: event.is_featured,
+                isVisible: event.is_visible,
+              };
+            });
           } else {
             console.warn('⚠️ Gallery: Supabase returned no events or error:', error);
           }

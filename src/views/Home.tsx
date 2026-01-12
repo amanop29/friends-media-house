@@ -30,6 +30,7 @@ interface FeaturedEvent {
 export function Home() {
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [bannerImage, setBannerImage] = useState<string>('');
+  const [bannerLoaded, setBannerLoaded] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [featuredEvents, setFeaturedEvents] = useState<FeaturedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,17 +44,34 @@ export function Home() {
     const localSettings = getSettings();
     setSettings(localSettings);
     
-    // Set banner from local settings first
+    // Set banner from local settings first and preload it
     if (localSettings.homeBannerUrl) {
       setBannerImage(localSettings.homeBannerUrl);
+      
+      // Preload the banner image for faster loading
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = localSettings.homeBannerUrl;
+      link.fetchPriority = 'high';
+      document.head.appendChild(link);
     }
     
     // Then fetch from Supabase to get latest
     fetchSettings().then(supabaseSettings => {
       setSettings(supabaseSettings);
       // Update banner from Supabase settings
-      if (supabaseSettings.homeBannerUrl) {
+      if (supabaseSettings.homeBannerUrl && supabaseSettings.homeBannerUrl !== localSettings.homeBannerUrl) {
         setBannerImage(supabaseSettings.homeBannerUrl);
+        setBannerLoaded(false); // Reset loaded state for new image
+        
+        // Preload the new banner image
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = supabaseSettings.homeBannerUrl;
+        link.fetchPriority = 'high';
+        document.head.appendChild(link);
       }
     });
 
@@ -93,7 +111,7 @@ export function Home() {
           description: event.description,
           date: event.date,
           location: event.location,
-          category: event.category,
+          category: event.custom_category || event.category, // Use custom category if available
           coverImage: event.cover_image || event.cover_image_url,
           coupleNames: event.couple_names,
           isFeatured: event.is_featured,
@@ -193,18 +211,30 @@ export function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section - Only render if banner image is loaded */}
-      {bannerImage && (
+      {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden pt-20">
         {/* Background Image */}
         <div className="absolute inset-0">
-          <ImageWithFallback
-            src={bannerImage}
-            alt="Hero"
-            className="w-full h-full object-cover"
-            eager
-            fetchPriority="high"
-          />
+          {/* Blur placeholder while loading */}
+          {!bannerLoaded && (
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-pulse" />
+          )}
+          
+          {bannerImage && (
+            <img
+              src={bannerImage}
+              alt="Hero Banner"
+              className={`w-full h-full object-cover transition-opacity duration-700 ${
+                bannerLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              onLoad={() => setBannerLoaded(true)}
+              style={{ contentVisibility: 'auto' }}
+            />
+          )}
+          
           {/* Gradient overlay - fades from dark at top to page background at bottom */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-[#FAFAFA] dark:to-[#0F0F0F]" />
         </div>
@@ -237,7 +267,6 @@ export function Home() {
           </motion.div>
         </div>
       </section>
-      )}
 
 
 

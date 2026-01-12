@@ -121,9 +121,20 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
 
   const handleAddCategory = () => {
     if (newCategory.trim()) {
-      addCategory(newCategory);
-      setCategories(getCategories());
-      setNewCategory('');
+      const success = addCategory(newCategory);
+      if (success) {
+        // Get the normalized category name (same normalization as in addCategory)
+        const normalizedCategoryName = newCategory
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        
+        setCategories(getCategories());
+        // Set the normalized category in formData
+        handleChange('category', normalizedCategoryName);
+        setNewCategory('');
+      }
     }
   };
 

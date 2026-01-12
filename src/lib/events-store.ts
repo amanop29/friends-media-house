@@ -178,12 +178,21 @@ export async function updateEvent(updatedEvent: Event, oldCoverImageUrl?: string
         'wedding': 'wedding',
         'pre-wedding': 'pre-wedding',
         'prewedding': 'pre-wedding',
+        'engagement': 'engagement',
+        'reception': 'reception',
+        'jainism': 'jainism',
+        'birthday': 'birthday',
+        'corporate': 'corporate',
         'event': 'event',
         'events': 'event',
         'film': 'film',
         'films': 'film',
       };
-      const mappedCategory = categoryMap[updatedEvent.category?.toLowerCase()] || 'other';
+      const normalizedCategory = updatedEvent.category?.toLowerCase() || 'event';
+      const mappedCategory = categoryMap[normalizedCategory] || 'other';
+      
+      // Determine if this is a custom category
+      const isCustomCategory = !categoryMap[normalizedCategory];
 
       await supabase
         .from('events')
@@ -194,6 +203,7 @@ export async function updateEvent(updatedEvent: Event, oldCoverImageUrl?: string
           date: updatedEvent.date || new Date().toISOString().split('T')[0],
           location: updatedEvent.location || '',
           category: mappedCategory,
+          custom_category: isCustomCategory ? normalizedCategory : null, // Store custom category name
           cover_image_url: updatedEvent.coverImage,
           is_visible: updatedEvent.isVisible ?? true,
           is_featured: updatedEvent.isFeatured ?? false,
@@ -393,7 +403,7 @@ export async function getEventsFromSupabase(): Promise<Event[]> {
       coupleNames: event.couple_names || '',
       date: event.date,
       location: event.location || '',
-      category: event.category || 'other',
+      category: event.custom_category || event.category || 'other', // Use custom category if available
       coverImage: event.cover_image_url || '',
       description: event.description || '',
       isVisible: event.is_visible ?? true,

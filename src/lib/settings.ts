@@ -115,6 +115,14 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
         console.warn('Failed to sync settings to Supabase:', error.message);
       } else {
         console.log('Settings synced to Supabase');
+        
+        // Trigger OG metadata refresh if banner was updated
+        try {
+          await fetch('/api/revalidate-og', { method: 'POST' });
+          console.log('Open Graph metadata refreshed');
+        } catch (refreshError) {
+          console.warn('Failed to refresh OG metadata:', refreshError);
+        }
       }
     }
   } catch (error) {

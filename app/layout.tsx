@@ -7,6 +7,10 @@ import { Analytics } from '@vercel/analytics/next';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import '@/styles/globals.css';
 
+// Force dynamic rendering so metadata always fetches latest banner
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',
@@ -22,51 +26,56 @@ const playfair = Playfair_Display({
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com';
 
 // Get OG image from Supabase settings (server-side)
-async function getOGImage(): Promise<string> {
-  // Prefer service role, but allow public client so metadata works without the service key
-  const client = supabaseAdmin ?? supabase;
+async function getOGImage(): Promise<string | null> {
+  try {
+    // Prefer service role, but allow public client so metadata works without the service key
+    const client = supabaseAdmin ?? supabase;
 
-  if (!client || typeof client.from !== 'function') {
-    throw new Error('Supabase client not configured');
+    if (!client || typeof client.from !== 'function') {
+      console.warn('[OG Image] Supabase client not configured');
+      return null;
+    }
+
+    const { data, error } = await client
+      .from('settings')
+      .select('value')
+      .eq('key', 'site_config')
+      .single();
+
+    if (error) {
+      console.warn('[OG Image] Failed to fetch settings:', error.message);
+      return null;
+    }
+
+    if (!data) {
+      console.warn('[OG Image] No settings data found in database');
+      return null;
+    }
+
+    const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+
+    if (!settings?.homeBannerUrl) {
+      console.warn('[OG Image] homeBannerUrl not found in settings');
+      return null;
+    }
+
+    // Ensure absolute URL
+    let imageUrl = settings.homeBannerUrl;
+    if (!imageUrl.startsWith('http')) {
+      imageUrl = `${siteUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+    }
+
+    console.log('[OG Image] Using banner:', imageUrl);
+    return imageUrl;
+  } catch (err) {
+    console.error('[OG Image] Unexpected error:', err);
+    return null;
   }
-
-  const { data, error } = await client
-    .from('settings')
-    .select('value')
-    .eq('key', 'site_config')
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to fetch settings: ${error.message}`);
-  }
-
-  if (!data) {
-    throw new Error('No settings data found in database');
-  }
-
-  const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-
-  if (!settings.homeBannerUrl) {
-    throw new Error('homeBannerUrl not found in settings');
-  }
-
-  // Ensure absolute URL
-  if (settings.homeBannerUrl.startsWith('http')) {
-    return settings.homeBannerUrl;
-  }
-
-  return `${siteUrl}${settings.homeBannerUrl.startsWith('/') ? '' : '/'}${settings.homeBannerUrl}`;
 }
 
 // Generate metadata dynamically to fetch OG image from Supabase
 export async function generateMetadata(): Promise<Metadata> {
-  let ogImage: string | undefined;
-
-  try {
-    ogImage = await getOGImage();
-  } catch (error) {
-    console.warn('OG Image: failed to load from Supabase', error);
-  }
+  const ogImage = await getOGImage();
 
   return {
     metadataBase: new URL(siteUrl),
@@ -146,6 +155,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${playfair.variable} overflow-x-hidden`}>
+      <head>
+        {/* DNS prefetch and preconnect for faster image loading */}
+        <link rel="dns-prefetch" href="https://pub-3f6e9022e56e4c97a0e76f6886a03ff4.r2.dev" />
+        <link rel="preconnect" href="https://pub-3f6e9022e56e4c97a0e76f6886a03ff4.r2.dev" crossOrigin="anonymous" />
+      </head>
       <body className={`${inter.className} overflow-x-hidden min-h-screen`}>
         <ThemeProvider>
           {children}

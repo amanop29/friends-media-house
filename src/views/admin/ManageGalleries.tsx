@@ -85,7 +85,7 @@ export function ManageGalleries() {
               description: event.description,
               date: event.date,
               location: event.location,
-              category: event.category,
+              category: event.custom_category || event.category, // Use custom category if available
               coverImage: event.cover_image || event.cover_image_url,
               coupleNames: event.couple_names,
               photoCount: event.photo_count || 0,
