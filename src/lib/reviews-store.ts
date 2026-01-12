@@ -174,6 +174,14 @@ export async function updateReview(updatedReview: Review): Promise<void> {
 export async function deleteReview(reviewId: string): Promise<void> {
   try {
     if (supabase) {
+      // First get the review to check if it has an avatar to delete
+      const { data: review } = await supabase
+        .from('reviews')
+        .select('avatar_url')
+        .eq('id', reviewId)
+        .single();
+
+      // Delete the review from database
       const { error } = await supabase
         .from('reviews')
         .delete()
@@ -181,6 +189,25 @@ export async function deleteReview(reviewId: string): Promise<void> {
 
       if (!error) {
         console.log('✅ Review deleted successfully');
+        
+        // Delete avatar image from R2 if it exists and is a URL
+        if (review?.avatar_url && review.avatar_url.startsWith('http')) {
+          try {
+            const response = await fetch('/api/upload/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: review.avatar_url }),
+            });
+            if (response.ok) {
+              console.log('✅ Review avatar deleted from R2:', review.avatar_url);
+            } else {
+              console.warn('⚠️ Failed to delete review avatar from R2:', await response.text());
+            }
+          } catch (deleteErr) {
+            console.warn('⚠️ Error deleting review avatar from R2:', deleteErr);
+          }
+        }
+        
         window.dispatchEvent(new CustomEvent('reviewsUpdated'));
         return;
       }

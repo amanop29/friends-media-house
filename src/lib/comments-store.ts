@@ -151,6 +151,21 @@ export async function updateComment(updatedComment: PhotoComment): Promise<void>
 
 export async function deleteComment(commentId: string): Promise<void> {
   try {
+    // First get the comment to check if it has an avatar to delete
+    let avatarUrl: string | null = null;
+    if (supabaseAdmin) {
+      const { data: comment } = await supabaseAdmin
+        .from('photo_comments')
+        .select('avatar')
+        .eq('id', commentId)
+        .single();
+      
+      // Check if avatar is a URL (not a JSON icon config)
+      if (comment?.avatar && comment.avatar.startsWith('http')) {
+        avatarUrl = comment.avatar;
+      }
+    }
+
     // Use the API endpoint to delete
     const response = await fetch(`/api/comments?id=${commentId}`, {
       method: 'DELETE',
@@ -159,6 +174,24 @@ export async function deleteComment(commentId: string): Promise<void> {
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to delete comment');
+    }
+
+    // Delete avatar image from R2 if it exists
+    if (avatarUrl) {
+      try {
+        const deleteResponse = await fetch('/api/upload/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: avatarUrl }),
+        });
+        if (deleteResponse.ok) {
+          console.log('✅ Comment avatar deleted from R2:', avatarUrl);
+        } else {
+          console.warn('⚠️ Failed to delete comment avatar from R2:', await deleteResponse.text());
+        }
+      } catch (deleteErr) {
+        console.warn('⚠️ Error deleting comment avatar from R2:', deleteErr);
+      }
     }
 
     // Also update localStorage
