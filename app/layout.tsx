@@ -76,6 +76,7 @@ async function getOGImage(): Promise<string | null> {
 // Generate metadata dynamically to fetch OG image from Supabase
 export async function generateMetadata(): Promise<Metadata> {
   const ogImage = await getOGImage();
+  const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID;
 
   return {
     metadataBase: new URL(siteUrl),
@@ -93,6 +94,9 @@ export async function generateMetadata(): Promise<Metadata> {
       address: false,
       telephone: false,
     },
+    other: fbAppId ? {
+      'fb:app_id': fbAppId,
+    } : {},
     openGraph: {
       type: 'website',
       locale: 'en_US',
