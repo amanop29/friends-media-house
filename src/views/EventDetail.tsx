@@ -570,6 +570,7 @@ export function EventDetail({ slug }: { slug?: string }) {
     
     // If only one photo, queue a single download
     if (photosToDownload.length === 1) {
+      toast.info('Starting download...', { duration: 2000 });
       const filename = `photo-${Date.now()}.jpg`;
       runDownloadJob('Downloading photo', async (progress) => {
         await downloadImage(photosToDownload[0].url, filename, progress);
@@ -579,6 +580,7 @@ export function EventDetail({ slug }: { slug?: string }) {
       return;
     }
 
+    toast.info(`Preparing ${selectedPhotos.size} photos for download...`, { duration: 2500 });
     runDownloadJob(`Downloading ${selectedPhotos.size} photos`, async (progress) => {
       const zip = new JSZip();
       const folder = zip.folder(event?.title || 'photos');
@@ -658,6 +660,7 @@ export function EventDetail({ slug }: { slug?: string }) {
   };
 
   const queueSingleImageDownload = (url: string, filename?: string) => {
+    toast.info('Starting download...', { duration: 2000 });
     runDownloadJob('Downloading photo', async (progress) => {
       await downloadImage(url, filename, progress);
     });
