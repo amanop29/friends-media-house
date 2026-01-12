@@ -71,13 +71,15 @@ export function Gallery() {
       
       setEvents(loadedEvents);
       
-      // Calculate categories from loaded events
+      // Calculate categories from loaded events (including custom categories)
       const visibleEvents = loadedEvents.filter(event => event.isVisible !== false);
-      const uniqueCategories = new Set(visibleEvents.map(event => event.category));
-      const allCategories = getCategories();
-      const activeCategories = allCategories
-        .filter(cat => uniqueCategories.has(cat))
-        .map(cat => ({ id: cat, label: getCategoryDisplayName(cat) }));
+      const uniqueCategories = Array.from(new Set(visibleEvents.map(event => event.category).filter(Boolean)));
+      
+      // Map each unique category to its display format
+      const activeCategories = uniqueCategories.map(cat => ({ 
+        id: cat, 
+        label: getCategoryDisplayName(cat) 
+      }));
       
       setDynamicCategories(activeCategories);
       setMounted(true);
@@ -92,12 +94,12 @@ export function Gallery() {
       setEvents(updatedEvents);
       // Update categories when events change (new category might be added)
       const visibleEvts = updatedEvents.filter(event => event.isVisible !== false);
-      const uniqueCats = new Set(visibleEvts.map(event => event.category));
-      const allCats = getCategories();
+      const uniqueCats = Array.from(new Set(visibleEvts.map(event => event.category).filter(Boolean)));
       setDynamicCategories(
-        allCats
-          .filter(cat => uniqueCats.has(cat))
-          .map(cat => ({ id: cat, label: getCategoryDisplayName(cat) }))
+        uniqueCats.map(cat => ({ 
+          id: cat, 
+          label: getCategoryDisplayName(cat) 
+        }))
       );
     };
 
