@@ -157,10 +157,11 @@ export function ManageGalleries() {
     }
   };
 
-  const handleToggleVisibility = (eventId: string) => {
+  const handleToggleVisibility = async (eventId: string) => {
     setEvents(events.map(event => {
       if (event.id === eventId) {
         const newVisibility = !event.isVisible;
+        // Call async function but don't await to keep UI responsive
         toggleEventVisibility(eventId, newVisibility);
         toast.success(newVisibility ? 'Gallery is now visible on website' : 'Gallery is now hidden from website');
         return { ...event, isVisible: newVisibility };

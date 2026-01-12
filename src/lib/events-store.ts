@@ -364,12 +364,30 @@ export async function deleteEvent(event: Event): Promise<void> {
   console.log(`Event "${event.title}" deleted successfully`);
 }
 
-export function toggleEventVisibility(eventId: string, newVisibility?: boolean): void {
+export async function toggleEventVisibility(eventId: string, newVisibility?: boolean): Promise<void> {
   const events = getEvents();
   const event = events.find(e => e.id === eventId);
   if (event) {
     event.isVisible = newVisibility !== undefined ? newVisibility : !event.isVisible;
     saveEvents(events);
+    
+    // Sync to Supabase if available
+    if (supabase && event.supabaseId) {
+      try {
+        const { error } = await supabase
+          .from('events')
+          .update({ is_visible: event.isVisible })
+          .eq('id', event.supabaseId);
+        
+        if (error) {
+          console.warn('Failed to sync visibility to Supabase:', error);
+        } else {
+          console.log(`Event visibility updated in Supabase: ${event.supabaseId} -> ${event.isVisible}`);
+        }
+      } catch (err) {
+        console.warn('Error syncing visibility to Supabase:', err);
+      }
+    }
   }
 }
 
