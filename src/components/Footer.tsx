@@ -355,7 +355,7 @@ export function Footer() {
               damping: 20,
             }}
             onClick={handleScrollToTop}
-            className="fixed bottom-8 right-8 z-50 group"
+            className="fixed bottom-24 right-8 z-40 group"
             whileHover={{ scale: 1.1, y: -5 }}
             whileTap={{ scale: 0.9 }}
           >
