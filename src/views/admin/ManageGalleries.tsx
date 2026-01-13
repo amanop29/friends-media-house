@@ -425,7 +425,7 @@ export function ManageGalleries() {
       const uploadToast = toast.loading(`Uploading 0/${photos.length} photos...`);
 
       // Upload photos in parallel batches for faster uploads
-      const BATCH_SIZE = 3; // Upload 3 photos at a time
+      const BATCH_SIZE = 6; // Upload 6 photos at a time for faster processing
       const r2UploadResults = [];
       
       for (let i = 0; i < photos.length; i += BATCH_SIZE) {
