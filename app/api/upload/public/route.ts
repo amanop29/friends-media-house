@@ -83,11 +83,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (5MB max for public uploads)
-    const maxSize = 5 * 1024 * 1024;
+    // Validate file size (10MB max - increased from 5MB)
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 5MB.' },
+        { error: 'File too large. Maximum size is 10MB.' },
         { status: 400 }
       );
     }
@@ -101,16 +101,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Convert to buffer more efficiently
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to R2
+    console.log(`Uploading ${file.name} (${(file.size / 1024).toFixed(1)}KB) to ${folder}`);
+
+    // Upload to R2 directly without additional processing
+    // Client-side compression is already done if needed
     const uploadResult = await uploadToR2(
       buffer,
       file.name,
       file.type,
       folder as any
     );
+
+    console.log(`Upload successful: ${uploadResult.url}`);
 
     return NextResponse.json({
       success: true,

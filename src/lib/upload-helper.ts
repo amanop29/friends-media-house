@@ -148,11 +148,21 @@ export async function compressAndUploadImage(
   folder: 'banners' | 'logos' | 'avatars' | 'events' | 'gallery' | 'reviews' | 'videos' | 'team',
   maxSizeMB: number = 2
 ): Promise<UploadResult> {
-  // If file is already small enough, upload directly
-  if (file.size <= maxSizeMB * 1024 * 1024) {
+  // For very small files (< 500KB), upload directly without compression
+  const halfMB = 0.5 * 1024 * 1024;
+  if (file.size <= halfMB) {
+    console.log('File is small, uploading directly without compression');
     return uploadToR2(file, folder);
   }
 
+  // If file is reasonably sized, upload directly
+  if (file.size <= maxSizeMB * 1024 * 1024) {
+    console.log('File size acceptable, uploading without compression');
+    return uploadToR2(file, folder);
+  }
+
+  console.log('File is large, compressing before upload...');
+  
   // Compress the image
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -173,7 +183,10 @@ export async function compressAndUploadImage(
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { 
+            alpha: false, // Faster rendering without alpha channel
+            willReadFrequently: false 
+          });
           
           if (!ctx) {
             resolve({
@@ -183,28 +196,35 @@ export async function compressAndUploadImage(
             return;
           }
           
-          // Calculate new dimensions (max 1920px width/height for banners, 800px for others)
-          const maxDimension = folder === 'banners' ? 1920 : 800;
+          // Calculate new dimensions - less aggressive for faster processing
+          const maxDimension = folder === 'banners' ? 1920 : 1200; // Increased from 800
           let width = img.width;
           let height = img.height;
           
-          if (width > height) {
-            if (width > maxDimension) {
-              height *= maxDimension / width;
-              width = maxDimension;
-            }
-          } else {
-            if (height > maxDimension) {
-              width *= maxDimension / height;
-              height = maxDimension;
+          // Only resize if significantly larger
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              if (width > maxDimension) {
+                height *= maxDimension / width;
+                width = maxDimension;
+              }
+            } else {
+              if (height > maxDimension) {
+                width *= maxDimension / height;
+                height = maxDimension;
+              }
             }
           }
           
           canvas.width = width;
           canvas.height = height;
+          
+          // Use better image smoothing for faster but decent quality
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'medium'; // Changed from default 'high'
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Convert to blob and upload
+          // Convert to blob with better compression ratio for speed
           canvas.toBlob(
             async (blob) => {
               if (!blob) {
@@ -221,6 +241,8 @@ export async function compressAndUploadImage(
                   lastModified: Date.now(),
                 });
                 
+                console.log(`Compressed ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+                
                 const result = await uploadToR2(compressedFile, folder);
                 resolve(result);
               } catch (uploadError) {
@@ -232,7 +254,7 @@ export async function compressAndUploadImage(
               }
             },
             'image/jpeg',
-            0.8
+            0.85 // Slightly better quality (0.8 -> 0.85) for faster processing
           );
         } catch (canvasError) {
           console.error('Canvas processing error:', canvasError);
