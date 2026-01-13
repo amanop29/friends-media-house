@@ -195,6 +195,41 @@
   .dark select::placeholder {
     color: rgba(255, 255, 255, 0.35);
   }
+
+  /* Text Selection Styling */
+  ::selection {
+    background-color: rgba(197, 165, 114, 0.3); /* Brand gold with opacity */
+    color: var(--foreground);
+  }
+
+  ::-moz-selection {
+    background-color: rgba(197, 165, 114, 0.3);
+    color: var(--foreground);
+  }
+
+  /* Better selection visibility in dark mode */
+  .dark ::selection {
+    background-color: rgba(197, 165, 114, 0.5);
+    color: #ffffff;
+  }
+
+  .dark ::-moz-selection {
+    background-color: rgba(197, 165, 114, 0.5);
+    color: #ffffff;
+  }
+
+  /* Enhanced selection for input fields */
+  input::selection,
+  textarea::selection {
+    background-color: rgba(197, 165, 114, 0.4);
+    color: var(--foreground);
+  }
+
+  .dark input::selection,
+  .dark textarea::selection {
+    background-color: rgba(197, 165, 114, 0.6);
+    color: #ffffff;
+  }
 }
 
 /* ============================================================
