@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
+import { cache } from 'react';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { Toaster } from '@/components/ui/sonner';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
+import NextTopLoader from 'nextjs-toploader';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import '@/styles/globals.css';
 
-// Force dynamic rendering so metadata always fetches latest banner
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Optimize metadata fetching - cache for 1 hour
+export const revalidate = 3600;
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -25,8 +26,8 @@ const playfair = Playfair_Display({
 // Base URL for absolute paths
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://friendsmediahouse.com';
 
-// Get OG image from Supabase settings (server-side)
-async function getOGImage(): Promise<string | null> {
+// Get OG image from Supabase settings (server-side) with caching
+const getOGImage = cache(async (): Promise<string | null> => {
   try {
     // Prefer service role, but allow public client so metadata works without the service key
     const client = supabaseAdmin ?? supabase;
@@ -43,19 +44,20 @@ async function getOGImage(): Promise<string | null> {
       .single();
 
     if (error) {
-      console.warn('[OG Image] Failed to fetch settings:', error.message);
+      // Don't log warning for expected "no rows" error
+      if (!error.message?.includes('no rows')) {
+        console.warn('[OG Image] Failed to fetch settings:', error.message);
+      }
       return null;
     }
 
     if (!data) {
-      console.warn('[OG Image] No settings data found in database');
       return null;
     }
 
     const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
 
     if (!settings?.homeBannerUrl) {
-      console.warn('[OG Image] homeBannerUrl not found in settings');
       return null;
     }
 
@@ -65,13 +67,12 @@ async function getOGImage(): Promise<string | null> {
       imageUrl = `${siteUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
     }
 
-    console.log('[OG Image] Using banner:', imageUrl);
     return imageUrl;
   } catch (err) {
     console.error('[OG Image] Unexpected error:', err);
     return null;
   }
-}
+});
 
 // Generate metadata dynamically to fetch OG image from Supabase
 export async function generateMetadata(): Promise<Metadata> {
@@ -165,6 +166,17 @@ export default function RootLayout({
         <link rel="preconnect" href="https://pub-3f6e9022e56e4c97a0e76f6886a03ff4.r2.dev" crossOrigin="anonymous" />
       </head>
       <body className={`${inter.className} overflow-x-hidden min-h-screen`}>
+        <NextTopLoader
+          color="#C5A572"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #C5A572,0 0 5px #C5A572"
+        />
         <ThemeProvider>
           {children}
           <Toaster position="top-center" richColors />

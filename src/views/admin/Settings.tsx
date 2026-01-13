@@ -19,6 +19,10 @@ export function Settings() {
   const [logoImage, setLogoImage] = useState<string>('');
   const [logoPreview, setLogoPreview] = useState<string>('');
   
+  // Refs for file inputs to reset them after upload
+  const bannerInputRef = React.useRef<HTMLInputElement>(null);
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
+  
   // Admin credentials state
   const [adminEmail, setAdminEmail] = useState<string>('');
   const [currentPassword, setCurrentPassword] = useState<string>('');
@@ -173,9 +177,24 @@ export function Settings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('Banner upload started:', { 
+      fileName: file.name, 
+      fileSize: file.size, 
+      fileType: file.type 
+    });
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
+      return;
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error('File too large. Maximum size is 10MB.');
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
       return;
     }
 
@@ -186,11 +205,16 @@ export function Settings() {
       // Store previous banner URL for deletion
       const previousBannerUrl = bannerImage;
 
+      console.log('Starting compression and upload...');
       // Upload to R2
       const result = await compressAndUploadImage(file, 'banners', 5);
       
+      console.log('Upload result:', result);
+      
       if (!result.success || !result.url) {
+        console.error('Upload failed:', result.error);
         toast.error(result.error || 'Failed to upload banner', { id: loadingToast });
+        if (bannerInputRef.current) bannerInputRef.current.value = '';
         return;
       }
 
@@ -211,10 +235,15 @@ export function Settings() {
       setFormData(updatedSettings);
       await saveSettings(updatedSettings);
       
+      console.log('Banner uploaded successfully:', bannerUrl);
       toast.success('Banner image uploaded successfully!', { id: loadingToast });
+      
+      // Reset file input
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
     } catch (error) {
       console.error('Banner upload error:', error);
       toast.error('Failed to upload banner image', { id: loadingToast });
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
     }
   };
 
@@ -508,6 +537,7 @@ export function Settings() {
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    ref={bannerInputRef}
                     onChange={handleBannerUpload}
                   />
                 </div>
@@ -555,7 +585,8 @@ export function Settings() {
                   <input 
                     id="logoUpload" 
                     type="file" 
-                    accept="image/*,.svg,image/svg+xml" 
+                    accept="image/*,.svg,image/svg+xml"
+                    ref={logoInputRef}
                     onChange={handleLogoUpload}
                     className="hidden" 
                   />
