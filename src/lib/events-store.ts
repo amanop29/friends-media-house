@@ -249,46 +249,53 @@ export async function deleteEvent(event: Event): Promise<void> {
   }
   console.log(`Found ${allVideos.length} videos to delete for event ${event.id}`);
 
-  // 2) Delete all photo files from R2 (the delete API validates URL ownership)
-  for (const photo of allPhotos) {
+  // 2) Delete all photo files from R2 in parallel (the delete API validates URL ownership)
+  const photoDeletePromises = allPhotos.flatMap(photo => {
+    const promises = [];
     if (photo.url && photo.url.startsWith('http')) {
       console.log(`Deleting photo from R2: ${photo.url}`);
-      await deleteFromR2Api(photo.url);
-      
-      // Also delete thumbnail if available
-      const thumbUrl = photo.thumbnail || (photo as any).thumbnail_url;
-      if (thumbUrl && thumbUrl.startsWith('http') && thumbUrl !== photo.url) {
-        console.log(`Deleting photo thumbnail from R2: ${thumbUrl}`);
-        await deleteFromR2Api(thumbUrl);
-      }
+      promises.push(deleteFromR2Api(photo.url));
     }
-  }
+    // Also delete thumbnail if available
+    const thumbUrl = photo.thumbnail || (photo as any).thumbnail_url;
+    if (thumbUrl && thumbUrl.startsWith('http') && thumbUrl !== photo.url) {
+      console.log(`Deleting photo thumbnail from R2: ${thumbUrl}`);
+      promises.push(deleteFromR2Api(thumbUrl));
+    }
+    return promises;
+  });
 
-  // 2b) Delete all video files from R2
-  for (const video of allVideos) {
+  // 2b) Delete all video files from R2 in parallel
+  const videoDeletePromises = allVideos.flatMap(video => {
+    const promises = [];
     if (video.type === 'upload' && video.url && video.url.startsWith('http')) {
       console.log(`Deleting video from R2: ${video.url}`);
-      await deleteFromR2Api(video.url);
+      promises.push(deleteFromR2Api(video.url));
     }
     // Delete video thumbnail from R2 (if not a YouTube thumbnail)
     if (video.thumbnail && video.thumbnail.startsWith('http') && 
         !video.thumbnail.includes('youtube.com') && !video.thumbnail.includes('ytimg.com')) {
       console.log(`Deleting video thumbnail from R2: ${video.thumbnail}`);
-      await deleteFromR2Api(video.thumbnail);
+      promises.push(deleteFromR2Api(video.thumbnail));
     }
-  }
+    return promises;
+  });
 
-  // 3) Delete cover image from R2 (the delete API validates URL ownership)
+  // 3) Delete cover image from R2 in parallel (the delete API validates URL ownership)
+  const coverDeletePromises = [];
   if (event.coverImage && event.coverImage.startsWith('http')) {
     console.log(`Deleting cover image from R2: ${event.coverImage}`);
-    await deleteFromR2Api(event.coverImage);
+    coverDeletePromises.push(deleteFromR2Api(event.coverImage));
     
     // Delete stored cover thumbnail
     if (event.coverThumbnail && event.coverThumbnail.startsWith('http')) {
       console.log(`Deleting cover thumbnail from R2: ${event.coverThumbnail}`);
-      await deleteFromR2Api(event.coverThumbnail);
+      coverDeletePromises.push(deleteFromR2Api(event.coverThumbnail));
     }
   }
+
+  // Delete all R2 files in parallel
+  await Promise.allSettled([...photoDeletePromises, ...videoDeletePromises, ...coverDeletePromises]);
 
   // 4) Delete photos from Supabase (both by event_id and using supabaseEventId)
   try {

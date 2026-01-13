@@ -16,6 +16,7 @@ import { getPhotos, addPhotos, deletePhoto as deletePhotoFromStore, getPhotosByE
 import { getCategories, getCategoryDisplayName } from '../../lib/categories-store';
 import { logActivity, getAdminEmail } from '../../lib/activity-log';
 import { uploadToR2 } from '../../lib/upload-helper';
+import { batchUploadToR2 } from '../../lib/batch-upload';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
@@ -137,23 +138,27 @@ export function ManageGalleries() {
     if (window.confirm(`Are you sure you want to delete "${eventTitle}"?`)) {
       const target = events.find(e => e.id === eventId);
       if (!target) return;
-      await deleteEventFromStore(target);
+      
+      // Show immediate feedback - deletion happens in background
+      toast.success('Event deleted successfully');
       setEvents(events.filter(e => e.id !== eventId));
       
-      // Log activity
-      try {
-        await logActivity({
-          entityType: 'event',
-          entityId: target.supabaseId || target.id,
-          action: 'delete',
-          description: `Deleted event "${eventTitle}"`,
-          adminEmail: getAdminEmail() || undefined,
-        });
-      } catch (logErr) {
-        console.warn('Failed to log delete activity:', logErr);
-      }
+      // Delete everything in background (don't wait)
+      deleteEventFromStore(target).catch(err => {
+        console.error('Background deletion error:', err);
+        toast.error('Error cleaning up event files');
+      });
       
-      toast.success('Event deleted successfully');
+      // Log activity in background
+      logActivity({
+        entityType: 'event',
+        entityId: target.supabaseId || target.id,
+        action: 'delete',
+        description: `Deleted event "${eventTitle}"`,
+        adminEmail: getAdminEmail() || undefined,
+      }).catch(logErr => {
+        console.warn('Failed to log delete activity:', logErr);
+      });
     }
   };
 
@@ -416,89 +421,61 @@ export function ManageGalleries() {
     }
 
     try {
-      // Initialize progress tracking
-      setUploadProgress(prev => ({
-        ...prev,
-        [eventId]: { current: 0, total: photos.length }
-      }));
-
-      const uploadToast = toast.loading(`Uploading 0/${photos.length} photos...`);
-
-      // Upload photos in parallel batches for faster uploads
-      const BATCH_SIZE = 6; // Upload 6 photos at a time for faster processing
-      const r2UploadResults = [];
+      const uploadToast = toast.loading(`Preparing upload of ${photos.length} photos...`);
       
-      for (let i = 0; i < photos.length; i += BATCH_SIZE) {
-        const batch = photos.slice(i, Math.min(i + BATCH_SIZE, photos.length));
-        
-        // Upload batch in parallel
-        const batchResults = await Promise.allSettled(
-          batch.map(async (photo) => {
-            try {
-              const result = await uploadToR2(photo.file, 'events');
-              return { id: photo.id, result };
-            } catch (err) {
-              console.error(`Failed to upload ${photo.file.name} to R2:`, err);
-              return { id: photo.id, result: { success: false, error: String(err) } };
+      // Use new batch upload system - direct to R2 with presigned URLs
+      const result = await batchUploadToR2(
+        photos.map(p => p.file),
+        {
+          folder: 'events',
+          concurrency: 6,
+          onProgress: (current, total) => {
+            setUploadProgress(prev => ({
+              ...prev,
+              [eventId]: { current, total }
+            }));
+            toast.loading(`Uploading ${current}/${total} photos...`, { id: uploadToast });
+          },
+          onFileComplete: (fileName, success) => {
+            if (!success) {
+              console.warn(`Failed: ${fileName}`);
             }
-          })
-        );
-        
-        // Process batch results
-        batchResults.forEach((promiseResult) => {
-          if (promiseResult.status === 'fulfilled') {
-            r2UploadResults.push(promiseResult.value);
-          } else {
-            console.error('Batch upload error:', promiseResult.reason);
           }
-        });
-        
-        // Update progress after each batch
-        const current = Math.min(i + BATCH_SIZE, photos.length);
-        setUploadProgress(prev => ({
-          ...prev,
-          [eventId]: { current, total: photos.length }
-        }));
-        toast.loading(`Uploading ${current}/${photos.length} photos...`, { id: uploadToast });
-      }
-      
+        }
+      );
+
       toast.dismiss(uploadToast);
 
-      // Build photo objects with R2 URLs (not local previews)
-      const newPhotos = r2UploadResults
-        .filter(({ result }) => result.success && result.url)
-        .map(({ id, result }) => {
-          // Find the original uploading photo to get dimensions
-          const uploadingPhoto = photos.find(p => p.id === id);
-          const width = uploadingPhoto?.width || 4;
-          const height = uploadingPhoto?.height || 3;
-          const orientation: 'portrait' | 'landscape' | 'square' = 
-            width > height ? 'landscape' : width < height ? 'portrait' : 'square';
-          
-          return {
-            id,
-            url: result.url!,
-            thumbnail: result.thumbnailUrl || result.url!, // Use thumbnailUrl if available
-            eventId: eventId,
-            supabaseEventId: event.supabaseId, // Required for Supabase sync
-            tags: [],
-            uploadedAt: new Date().toISOString(),
-            width,
-            height,
-            orientation,
-            fileSize: uploadingPhoto?.file.size || 0,
-            mimeType: uploadingPhoto?.file.type || 'image/jpeg',
-          };
-        });
-
-      if (newPhotos.length === 0) {
-        const failed = r2UploadResults.filter(({ result }) => !result.success);
-        console.error('R2 upload failed:', failed);
-        toast.error(`Failed to upload ${failed.length} photo(s) to R2. Check console for details.`);
+      if (result.successful.length === 0) {
+        toast.error(`Failed to upload ${result.stats.failed} photos`);
         return;
       }
 
-      // Add photos to the store (also syncs to Supabase)
+      // Build photo objects with uploaded R2 URLs
+      const newPhotos = result.successful.map((uploadedFile) => {
+        const uploadingPhoto = photos.find(p => p.file.name === uploadedFile.fileName);
+        const width = uploadingPhoto?.width || 4;
+        const height = uploadingPhoto?.height || 3;
+        const orientation: 'portrait' | 'landscape' | 'square' = 
+          width > height ? 'landscape' : width < height ? 'portrait' : 'square';
+        
+        return {
+          id: uploadedFile.fileName,
+          url: uploadedFile.url,
+          thumbnail: uploadedFile.url, // Same as main image for now
+          eventId: eventId,
+          supabaseEventId: event.supabaseId,
+          tags: [],
+          uploadedAt: new Date().toISOString(),
+          width,
+          height,
+          orientation,
+          fileSize: uploadingPhoto?.file.size || 0,
+          mimeType: uploadingPhoto?.file.type || 'image/jpeg',
+        };
+      });
+
+      // Add photos to the store (syncs to Supabase)
       await addPhotos(newPhotos);
 
       // Clear uploading photos and progress for this event
@@ -513,19 +490,17 @@ export function ManageGalleries() {
         return newProg;
       });
 
-      // Update the photos cache with new photos
+      // Update the photos cache
       setEventPhotosCache(prev => ({
         ...prev,
         [eventId]: [...(prev[eventId] || []), ...newPhotos]
       }));
 
-      // Force re-render to update photo list
       setPhotosVersion(v => v + 1);
-
-      // Also re-fetch from Supabase to get proper IDs
       setTimeout(() => fetchEventPhotos(eventId), 1000);
 
-      toast.success(`${newPhotos.length} photo(s) uploaded successfully!`);
+      const message = `${result.stats.successful} photo(s) uploaded${result.stats.failed > 0 ? `, ${result.stats.failed} failed` : ''} in ${(result.stats.duration / 1000).toFixed(1)}s`;
+      toast.success(message);
     } catch (error) {
       console.error('Error saving photos:', error);
       toast.error(`Failed to save photos: ${error instanceof Error ? error.message : String(error)}`);
