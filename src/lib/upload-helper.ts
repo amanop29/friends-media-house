@@ -62,8 +62,15 @@ export async function uploadToR2(
         { method: 'GET' }
       );
       
+      if (!presignRes.ok) {
+        const errorText = await presignRes.text();
+        console.error('Presign request failed:', errorText);
+        return { success: false, error: `Failed to get upload URL: ${presignRes.status}` };
+      }
+      
       const presign = await presignRes.json();
-      if (!presignRes.ok || !presign?.uploadUrl) {
+      if (!presign?.uploadUrl) {
+        console.error('Invalid presign response:', presign);
         return { success: false, error: presign?.error || 'Failed to get upload URL' };
       }
 
@@ -75,6 +82,8 @@ export async function uploadToR2(
       });
 
       if (!putRes.ok) {
+        const errorText = await putRes.text();
+        console.error('R2 upload failed:', errorText);
         return { success: false, error: `Upload failed (${putRes.status})` };
       }
 
@@ -96,14 +105,22 @@ export async function uploadToR2(
       signal: AbortSignal.timeout(60000),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Upload request failed:', response.status, errorText);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
       return {
         success: false,
-        error: data.error || 'Upload failed',
+        error: errorData.error || `Upload failed (${response.status})`,
       };
     }
+
+    const data = await response.json();
 
     return {
       success: true,
@@ -114,7 +131,7 @@ export async function uploadToR2(
     console.error('Upload error:', error);
     return {
       success: false,
-      error: 'Failed to upload file',
+      error: error instanceof Error ? error.message : 'Failed to upload file',
     };
   }
 }
@@ -139,55 +156,91 @@ export async function compressAndUploadImage(
   // Compress the image
   return new Promise((resolve) => {
     const reader = new FileReader();
+    reader.onerror = () => {
+      resolve({
+        success: false,
+        error: 'Failed to read image file',
+      });
+    };
     reader.onload = (e) => {
       const img = new Image();
+      img.onerror = () => {
+        resolve({
+          success: false,
+          error: 'Failed to load image',
+        });
+      };
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Calculate new dimensions (max 1920px width/height for banners, 800px for others)
-        const maxDimension = folder === 'banners' ? 1920 : 800;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > height) {
-          if (width > maxDimension) {
-            height *= maxDimension / width;
-            width = maxDimension;
-          }
-        } else {
-          if (height > maxDimension) {
-            width *= maxDimension / height;
-            height = maxDimension;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        // Convert to blob and upload
-        canvas.toBlob(
-          async (blob) => {
-            if (!blob) {
-              resolve({
-                success: false,
-                error: 'Failed to compress image',
-              });
-              return;
-            }
-            
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            resolve({
+              success: false,
+              error: 'Failed to get canvas context',
             });
-            
-            const result = await uploadToR2(compressedFile, folder);
-            resolve(result);
-          },
-          'image/jpeg',
-          0.8
-        );
+            return;
+          }
+          
+          // Calculate new dimensions (max 1920px width/height for banners, 800px for others)
+          const maxDimension = folder === 'banners' ? 1920 : 800;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > height) {
+            if (width > maxDimension) {
+              height *= maxDimension / width;
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width *= maxDimension / height;
+              height = maxDimension;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to blob and upload
+          canvas.toBlob(
+            async (blob) => {
+              if (!blob) {
+                resolve({
+                  success: false,
+                  error: 'Failed to compress image',
+                });
+                return;
+              }
+              
+              try {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                
+                const result = await uploadToR2(compressedFile, folder);
+                resolve(result);
+              } catch (uploadError) {
+                console.error('Upload error during compression:', uploadError);
+                resolve({
+                  success: false,
+                  error: uploadError instanceof Error ? uploadError.message : 'Upload failed',
+                });
+              }
+            },
+            'image/jpeg',
+            0.8
+          );
+        } catch (canvasError) {
+          console.error('Canvas processing error:', canvasError);
+          resolve({
+            success: false,
+            error: 'Failed to process image',
+          });
+        }
       };
       img.src = e.target?.result as string;
     };

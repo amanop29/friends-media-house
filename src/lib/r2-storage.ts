@@ -31,7 +31,7 @@ export async function uploadToR2(
   file: Buffer,
   fileName: string,
   contentType: string,
-  folder: 'events' | 'gallery' | 'reviews' | 'avatars' | 'team' = 'gallery'
+  folder: 'events' | 'gallery' | 'reviews' | 'avatars' | 'team' | 'banners' | 'logos' = 'gallery'
 ): Promise<UploadResult> {
   if (!s3Client || !isR2Configured) {
     throw new Error('R2 storage is not configured. Please set up environment variables.');
@@ -78,7 +78,7 @@ export async function deleteFromR2(key: string): Promise<void> {
 export async function getPresignedUploadUrl(
   fileName: string,
   contentType: string,
-  folder: 'events' | 'gallery' | 'reviews' | 'avatars' | 'team' = 'gallery'
+  folder: 'events' | 'gallery' | 'reviews' | 'avatars' | 'team' | 'banners' | 'logos' = 'gallery'
 ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
   if (!s3Client || !isR2Configured) {
     throw new Error('R2 storage is not configured. Please set up environment variables.');
