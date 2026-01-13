@@ -424,25 +424,42 @@ export function ManageGalleries() {
 
       const uploadToast = toast.loading(`Uploading 0/${photos.length} photos...`);
 
-      // Upload photos one by one to track progress
+      // Upload photos in parallel batches for faster uploads
+      const BATCH_SIZE = 3; // Upload 3 photos at a time
       const r2UploadResults = [];
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i];
-        try {
-          const result = await uploadToR2(photo.file, 'events');
-          r2UploadResults.push({ id: photo.id, result });
-          
-          // Update progress
-          const current = i + 1;
-          setUploadProgress(prev => ({
-            ...prev,
-            [eventId]: { current, total: photos.length }
-          }));
-          toast.loading(`Uploading ${current}/${photos.length} photos...`, { id: uploadToast });
-        } catch (err) {
-          console.error(`Failed to upload ${photo.file.name} to R2:`, err);
-          r2UploadResults.push({ id: photo.id, result: { success: false, error: String(err) } });
-        }
+      
+      for (let i = 0; i < photos.length; i += BATCH_SIZE) {
+        const batch = photos.slice(i, Math.min(i + BATCH_SIZE, photos.length));
+        
+        // Upload batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map(async (photo) => {
+            try {
+              const result = await uploadToR2(photo.file, 'events');
+              return { id: photo.id, result };
+            } catch (err) {
+              console.error(`Failed to upload ${photo.file.name} to R2:`, err);
+              return { id: photo.id, result: { success: false, error: String(err) } };
+            }
+          })
+        );
+        
+        // Process batch results
+        batchResults.forEach((promiseResult) => {
+          if (promiseResult.status === 'fulfilled') {
+            r2UploadResults.push(promiseResult.value);
+          } else {
+            console.error('Batch upload error:', promiseResult.reason);
+          }
+        });
+        
+        // Update progress after each batch
+        const current = Math.min(i + BATCH_SIZE, photos.length);
+        setUploadProgress(prev => ({
+          ...prev,
+          [eventId]: { current, total: photos.length }
+        }));
+        toast.loading(`Uploading ${current}/${photos.length} photos...`, { id: uploadToast });
       }
       
       toast.dismiss(uploadToast);

@@ -142,45 +142,45 @@ export async function POST(request: NextRequest) {
     const width = metadata.width || 0;
     const height = metadata.height || 0;
 
-    // Process images in parallel for maximum speed
+    // Process images in parallel for maximum speed - optimized for performance
     const [optimizedBuffer, thumbnailBuffer, blurBuffer] = await Promise.all([
-      // Optimize original image - smaller for faster processing
+      // Optimize original image - JPEG is 2-3x faster than WebP for encoding
       sharp(buffer)
-        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 80, effort: 0 }) // effort: 0 = fastest
+        .resize(1800, 1800, { fit: 'inside', withoutEnlargement: true, kernel: 'cubic' })
+        .jpeg({ quality: 82, mozjpeg: true }) // mozjpeg provides better compression
         .toBuffer(),
       
-      // Generate thumbnail - much smaller
+      // Generate thumbnail - fast and efficient
       sharp(buffer)
-        .resize(250, 250, { fit: 'cover' })
-        .webp({ quality: 60, effort: 0 })
+        .resize(300, 300, { fit: 'cover', position: 'entropy' })
+        .jpeg({ quality: 70, mozjpeg: true })
         .toBuffer(),
       
-      // Generate blur placeholder - tiny
+      // Generate blur placeholder - minimal processing
       sharp(buffer)
-        .resize(8, 8, { fit: 'cover' })
-        .blur(1)
-        .webp({ quality: 10, effort: 0 })
+        .resize(10, 10, { fit: 'cover', kernel: 'nearest' })
+        .blur(2)
+        .jpeg({ quality: 20 })
         .toBuffer()
     ]);
 
-    // Upload images in parallel
+    // Upload images in parallel - JPEG format for faster processing
     const [uploadResult, thumbnailResult] = await Promise.all([
       uploadToR2(
         optimizedBuffer,
-        file.name.replace(/\.[^/.]+$/, '.webp'),
-        'image/webp',
+        file.name.replace(/\.[^/.]+$/, '.jpg'),
+        'image/jpeg',
         folder as any
       ),
       uploadToR2(
         thumbnailBuffer,
-        `thumb-${file.name.replace(/\.[^/.]+$/, '.webp')}`,
-        'image/webp',
+        `thumb-${file.name.replace(/\.[^/.]+$/, '.jpg')}`,
+        'image/jpeg',
         folder as any
       )
     ]);
 
-    const blurDataUrl = `data:image/webp;base64,${blurBuffer.toString('base64')}`;
+    const blurDataUrl = `data:image/jpeg;base64,${blurBuffer.toString('base64')}`;
 
     // Save to database if gallery_id provided
     if (galleryId) {
