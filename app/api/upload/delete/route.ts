@@ -23,11 +23,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing url' }, { status: 400 });
     }
 
+    console.log('🗑️  DELETE REQUEST for URL:', url);
+
     // Get and normalize the base URL (remove trailing slash)
     let base = process.env.R2_PUBLIC_URL || process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '';
     base = base.replace(/\/$/, ''); // Remove trailing slash if present
     
     if (!base) {
+      console.error('❌ R2_PUBLIC_URL not configured');
       return NextResponse.json({ error: 'R2 public URL not configured' }, { status: 500 });
     }
 
@@ -35,28 +38,35 @@ export async function POST(request: NextRequest) {
     const normalizedUrl = url.replace(/\/$/, '');
     
     if (!normalizedUrl.startsWith(base)) {
-      console.error(`URL validation failed: ${normalizedUrl} does not start with ${base}`);
+      console.error(`❌ URL validation failed: ${normalizedUrl} does not start with ${base}`);
       return NextResponse.json({ error: 'URL does not belong to this bucket' }, { status: 400 });
     }
 
     const key = normalizedUrl.substring(base.length).replace(/^\//, '');
     if (!key) {
+      console.error('❌ Invalid key derived from URL');
       return NextResponse.json({ error: 'Invalid key derived from URL' }, { status: 400 });
     }
 
-    console.log(`Deleting R2 object with key: ${key}`);
+    console.log(`🔑 Extracted key: ${key}`);
     
     // Actually delete the file from R2
     try {
       await deleteFromR2(key);
-      console.log(`Successfully deleted R2 object: ${key}`);
-      return NextResponse.json({ success: true });
-    } catch (deleteError) {
-      console.error(`Failed to delete R2 object: ${key}`, deleteError);
-      return NextResponse.json({ error: 'Failed to delete file from R2' }, { status: 500 });
+      console.log(`✅ Successfully deleted R2 object: ${key}`);
+      return NextResponse.json({ success: true, message: `Deleted ${key}` });
+    } catch (deleteError: any) {
+      console.error(`❌ Failed to delete R2 object: ${key}`, deleteError);
+      return NextResponse.json({ 
+        error: 'Failed to delete file from R2', 
+        details: deleteError?.message || String(deleteError)
+      }, { status: 500 });
     }
-  } catch (error) {
-    console.error('R2 delete error:', error);
-    return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ R2 delete error:', error);
+    return NextResponse.json({ 
+      error: 'Failed to delete file', 
+      details: error?.message || String(error)
+    }, { status: 500 });
   }
 }

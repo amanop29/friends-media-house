@@ -15,9 +15,14 @@ export interface UploadResult {
  * @returns Promise<boolean> - true if deleted successfully
  */
 export async function deleteFromR2(url: string): Promise<boolean> {
-  if (!url) return false;
+  if (!url) {
+    console.warn('⚠️  deleteFromR2: No URL provided');
+    return false;
+  }
   
   try {
+    console.log('🗑️  Deleting from R2:', url);
+    
     const response = await fetch('/api/upload/delete', {
       method: 'POST',
       headers: {
@@ -26,14 +31,17 @@ export async function deleteFromR2(url: string): Promise<boolean> {
       body: JSON.stringify({ url }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      console.error('Failed to delete from R2:', await response.text());
+      console.error('❌ Failed to delete from R2:', response.status, data);
       return false;
     }
 
+    console.log('✅ Successfully deleted from R2:', url);
     return true;
   } catch (error) {
-    console.error('Error deleting from R2:', error);
+    console.error('❌ Error deleting from R2:', error);
     return false;
   }
 }

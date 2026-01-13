@@ -219,10 +219,14 @@ export function Settings() {
       }
 
       // Delete previous banner from R2 if exists
-      if (previousBannerUrl) {
-        await deleteFromR2(previousBannerUrl).catch(err => 
-          console.warn('Failed to delete previous banner:', err)
-        );
+      if (previousBannerUrl && previousBannerUrl.startsWith('http')) {
+        console.log('🗑️  Deleting previous banner:', previousBannerUrl);
+        const deleted = await deleteFromR2(previousBannerUrl);
+        if (deleted) {
+          console.log('✅ Previous banner deleted successfully');
+        } else {
+          console.warn('⚠️  Failed to delete previous banner, but continuing with upload');
+        }
       }
 
       // Save URL to state and Supabase settings
@@ -248,22 +252,40 @@ export function Settings() {
   };
 
   const handleRemoveBanner = async () => {
-    // Delete from R2 if exists
-    if (bannerImage) {
-      await deleteFromR2(bannerImage).catch(err => 
-        console.warn('Failed to delete banner from R2:', err)
-      );
+    if (!bannerImage) {
+      toast.error('No banner to remove');
+      return;
     }
 
-    setBannerImage('');
-    setBannerPreview('');
-    
-    // Update formData and save to Supabase
-    const updatedSettings = { ...formData, homeBannerUrl: undefined };
-    setFormData(updatedSettings);
-    await saveSettings(updatedSettings);
-    
-    toast.success('Banner image removed successfully!');
+    const confirmDelete = window.confirm('Are you sure you want to remove the banner image?');
+    if (!confirmDelete) return;
+
+    const loadingToast = toast.loading('Removing banner...');
+
+    try {
+      // Delete from R2 if exists
+      if (bannerImage.startsWith('http')) {
+        console.log('🗑️  Deleting banner from R2:', bannerImage);
+        const deleted = await deleteFromR2(bannerImage);
+        if (!deleted) {
+          console.warn('⚠️  Failed to delete banner from R2');
+          toast.warning('Banner removed from site, but failed to delete from storage', { id: loadingToast });
+        }
+      }
+
+      setBannerImage('');
+      setBannerPreview('');
+      
+      // Update formData and save to Supabase
+      const updatedSettings = { ...formData, homeBannerUrl: undefined };
+      setFormData(updatedSettings);
+      await saveSettings(updatedSettings);
+      
+      toast.success('Banner image removed successfully!', { id: loadingToast });
+    } catch (error) {
+      console.error('Error removing banner:', error);
+      toast.error('Failed to remove banner', { id: loadingToast });
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,10 +320,14 @@ export function Settings() {
       }
 
       // Delete previous logo from R2 if exists
-      if (previousLogoUrl) {
-        await deleteFromR2(previousLogoUrl).catch(err => 
-          console.warn('Failed to delete previous logo:', err)
-        );
+      if (previousLogoUrl && previousLogoUrl.startsWith('http')) {
+        console.log('🗑️  Deleting previous logo:', previousLogoUrl);
+        const deleted = await deleteFromR2(previousLogoUrl);
+        if (deleted) {
+          console.log('✅ Previous logo deleted successfully');
+        } else {
+          console.warn('⚠️  Failed to delete previous logo, but continuing with upload');
+        }
       }
 
       // Save URL to state and Supabase settings
@@ -322,22 +348,40 @@ export function Settings() {
   };
 
   const handleRemoveLogo = async () => {
-    // Delete from R2 if exists
-    if (logoImage) {
-      await deleteFromR2(logoImage).catch(err => 
-        console.warn('Failed to delete logo from R2:', err)
-      );
+    if (!logoImage) {
+      toast.error('No logo to remove');
+      return;
     }
 
-    setLogoImage('');
-    setLogoPreview('');
-    
-    // Update formData and save to Supabase
-    const updatedSettings = { ...formData, logoUrl: undefined };
-    setFormData(updatedSettings);
-    await saveSettings(updatedSettings);
-    
-    toast.success('Logo removed successfully!');
+    const confirmDelete = window.confirm('Are you sure you want to remove the logo?');
+    if (!confirmDelete) return;
+
+    const loadingToast = toast.loading('Removing logo...');
+
+    try {
+      // Delete from R2 if exists
+      if (logoImage.startsWith('http')) {
+        console.log('🗑️  Deleting logo from R2:', logoImage);
+        const deleted = await deleteFromR2(logoImage);
+        if (!deleted) {
+          console.warn('⚠️  Failed to delete logo from R2');
+          toast.warning('Logo removed from site, but failed to delete from storage', { id: loadingToast });
+        }
+      }
+
+      setLogoImage('');
+      setLogoPreview('');
+      
+      // Update formData and save to Supabase
+      const updatedSettings = { ...formData, logoUrl: undefined };
+      setFormData(updatedSettings);
+      await saveSettings(updatedSettings);
+      
+      toast.success('Logo removed successfully!', { id: loadingToast });
+    } catch (error) {
+      console.error('Error removing logo:', error);
+      toast.error('Failed to remove logo', { id: loadingToast });
+    }
   };
 
   return (
