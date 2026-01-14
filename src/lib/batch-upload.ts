@@ -25,11 +25,13 @@ export interface PresignedUrlResponse {
     fileName: string;
     key: string;
     presignedUrl: string;
+    publicUrl: string;
     contentType: string;
     fileSize: number;
     error?: string;
   }>;
   bucket: string;
+  publicUrl: string;
   timestamp: string;
 }
 
@@ -133,6 +135,8 @@ export async function batchUploadToR2(
       lastModified: file.lastModified,
     }));
 
+    console.log(`📝 File metadata prepared for ${fileMetadata.length} files`);
+    
     const presignResponse = await fetch('/api/r2/presign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,7 +147,9 @@ export async function batchUploadToR2(
     });
 
     if (!presignResponse.ok) {
-      throw new Error(`Failed to get presigned URLs: ${presignResponse.statusText}`);
+      const errorText = await presignResponse.text();
+      console.error('Presign API error response:', errorText);
+      throw new Error(`Failed to get presigned URLs: ${presignResponse.status} ${presignResponse.statusText}`);
     }
 
     const presignData = (await presignResponse.json()) as PresignedUrlResponse;
@@ -183,9 +189,8 @@ export async function batchUploadToR2(
               throw new Error(`Upload failed with status ${uploadResponse.status}`);
             }
 
-            // Generate public URL from key
-            const r2Endpoint = presignData.bucket;
-            const publicUrl = `https://${r2Endpoint}.r2.cloudflarecustomers.com/${presigned.key}`;
+            // Use public URL from presign response
+            const publicUrl = presigned.publicUrl;
 
             successful.push({
               fileName: file.name,
@@ -255,6 +260,10 @@ function uploadFileToR2(
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const timeout = setTimeout(() => {
+      xhr.abort();
+      reject(new Error('Upload timeout (60 seconds)'));
+    }, 60000);
 
     // Track upload progress
     if (onProgress) {
@@ -267,6 +276,7 @@ function uploadFileToR2(
     }
 
     xhr.addEventListener('load', () => {
+      clearTimeout(timeout);
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(
           new Response(null, {
@@ -275,16 +285,18 @@ function uploadFileToR2(
           })
         );
       } else {
-        reject(new Error(`Upload failed with status ${xhr.status}`));
+        reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
       }
     });
 
     xhr.addEventListener('error', () => {
-      reject(new Error('Upload request failed'));
+      clearTimeout(timeout);
+      reject(new Error(`Upload error for ${file.name}`));
     });
 
     xhr.addEventListener('abort', () => {
-      reject(new Error('Upload aborted'));
+      clearTimeout(timeout);
+      reject(new Error(`Upload aborted for ${file.name}`));
     });
 
     xhr.open('PUT', presignedUrl);

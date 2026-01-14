@@ -9,10 +9,11 @@ const s3Client = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
   },
-  endpoint: process.env.R2_ENDPOINT || '',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarecustomers.com`,
 });
 
-const R2_BUCKET = process.env.R2_BUCKET_NAME || 'friends-media-house';
+const R2_BUCKET = process.env.R2_BUCKET_NAME || 'friendsmediahouse-media';
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://media.friendsmediahouse.com';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
             fileName: file.name,
             key,
             presignedUrl,
+            publicUrl: `${R2_PUBLIC_URL}/${key}`,
             contentType: file.type || 'image/jpeg',
             fileSize: file.size,
           };
@@ -72,6 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       presignedUrls,
       bucket: R2_BUCKET,
+      publicUrl: R2_PUBLIC_URL,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
