@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToR2, isR2Available } from '@/lib/r2-storage';
 
+// Increase body size limit for video uploads (up to 4.5GB on Vercel Pro)
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '500mb',
+    },
+  },
+};
+
 // Server-side video upload proxy (bypasses CORS issues)
 const disableAuth = true;
 const requireAuth = false;
@@ -37,14 +46,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 100MB limit for proxy upload
-    const maxSize = 100 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 100MB for proxy upload.' },
-        { status: 400 }
-      );
-    }
+    // No size limit - upload any size video
+    console.log(`📹 Uploading video: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -56,13 +59,15 @@ export async function POST(request: NextRequest) {
       folder as any
     );
 
+    console.log(`✅ Video uploaded: ${uploadResult.url}`);
+
     return NextResponse.json({
       success: true,
       url: uploadResult.url,
       key: uploadResult.key,
     });
   } catch (error) {
-    console.error('Video proxy upload error:', error);
+    console.error('❌ Video proxy upload error:', error);
     return NextResponse.json(
       { error: 'Failed to upload video' },
       { status: 500 }
@@ -71,4 +76,4 @@ export async function POST(request: NextRequest) {
 }
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes for video processing
+export const maxDuration = 300; // 5 minutes for large video uploads

@@ -47,6 +47,15 @@
       ]
     }
   ],
+  "functions": {
+    "app/api/upload/video-proxy/route.ts": {
+      "maxDuration": 300,
+      "memory": 3008
+    },
+    "app/api/upload/video/route.ts": {
+      "maxDuration": 60
+    }
+  },
   "env": {
     "NEXT_PUBLIC_APP_URL": "https://friendsmediahouse.com"
   }

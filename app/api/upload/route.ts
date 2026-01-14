@@ -36,15 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 10MB.' },
-        { status: 400 }
-      );
-    }
-
+    // No size limit - upload any size image
     console.log(`📤 Uploading ${file.name} to ${folder} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
 
     // Convert file to buffer

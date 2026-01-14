@@ -83,14 +83,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (10MB max - increased from 5MB)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 10MB.' },
-        { status: 400 }
-      );
-    }
+    // No size limit - upload any size image
 
     // Validate folder
     const allowedFolders = ['banners', 'logos', 'avatars', 'reviews', 'team'];
