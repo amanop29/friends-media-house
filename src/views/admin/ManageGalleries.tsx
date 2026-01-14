@@ -813,7 +813,7 @@ export function ManageGalleries() {
                                 Event Photos ({eventPhotos.length})
                               </h4>
                               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                {eventPhotos.slice(0, 12).map((photo) => (
+                                {eventPhotos.map((photo) => (
                                   <div
                                     key={photo.id}
                                     className="relative h-24 rounded-lg overflow-hidden group"
@@ -834,13 +834,6 @@ export function ManageGalleries() {
                                   </div>
                                 ))}
                               </div>
-                              {eventPhotos.length > 12 && (
-                                <div className="mt-4 text-center">
-                                  <span className="text-sm text-[#707070] dark:text-[#A0A0A0]">
-                                    + {eventPhotos.length - 12} more photos
-                                  </span>
-                                </div>
-                              )}
                             </div>
 
                             {/* Save Photos Button */}
