@@ -513,7 +513,8 @@ export function ManageGalleries() {
       setPhotosVersion(v => v + 1);
       setTimeout(() => fetchEventPhotos(eventId), 1000);
 
-      const message = `${result.stats.successful} photo(s) uploaded${result.stats.failed > 0 ? `, ${result.stats.failed} failed` : ''} in ${(result.stats.duration / 1000).toFixed(1)}s`;
+      const failedCount = r2UploadResults.length - newPhotos.length;
+      const message = `${newPhotos.length} photo(s) uploaded successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`;
       toast.success(message);
     } catch (error) {
       console.error('Error saving photos:', error);
