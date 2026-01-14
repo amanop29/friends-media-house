@@ -9,7 +9,7 @@ const s3Client = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
   },
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarecustomers.com`,
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
 });
 
 const R2_BUCKET = process.env.R2_BUCKET_NAME || 'friendsmediahouse-media';
