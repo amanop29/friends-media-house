@@ -50,10 +50,10 @@
   "functions": {
     "app/api/upload/video-proxy/route.ts": {
       "maxDuration": 300,
-      "memory": 3008
+      "memory": 2048
     },
     "app/api/upload/video/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "env": {
