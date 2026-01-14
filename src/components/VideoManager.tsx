@@ -88,11 +88,6 @@ export function VideoManager({ videos, onChange, eventId }: VideoManagerProps) {
       return;
     }
 
-    if (file.size > 500 * 1024 * 1024) { // 500MB limit
-      toast.error('Video size should be less than 500MB');
-      return;
-    }
-
     const videoUrl = URL.createObjectURL(file);
     setUploadedVideo(videoUrl);
     setVideoFile(file);
@@ -380,7 +375,7 @@ export function VideoManager({ videos, onChange, eventId }: VideoManagerProps) {
                       placeholder="No video file selected"
                     />
                     <p className="text-sm text-[#707070] dark:text-[#A0A0A0] mt-2">
-                      Supported formats: MP4, MOV, AVI. Max size: 500MB
+                      Supported formats: MP4, MOV, AVI. No enforced size limit (large files may take longer to upload).
                     </p>
                   </div>
 

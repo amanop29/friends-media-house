@@ -263,31 +263,7 @@ export async function syncEventVideos(eventId: string, localVideos: Video[]): Pr
  */
 export async function uploadVideoToR2(file: File): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    // Upload through server proxy to handle CORS issues
-    const chunkSize = 10 * 1024 * 1024; // 10MB chunks
-    const chunks = Math.ceil(file.size / chunkSize);
-    
-    // For files under 100MB, use simple FormData upload
-    if (file.size < 100 * 1024 * 1024) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'videos');
-      
-      const response = await fetch('/api/upload/video-proxy', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        return { success: false, error: data.error || 'Upload failed' };
-      }
-      
-      return { success: true, url: data.url };
-    }
-    
-    // For larger files, try presigned URL first, fallback to proxy
+    // Prefer presigned direct-to-R2 upload to bypass Vercel body limits
     try {
       const presignRes = await fetch('/api/upload/video', {
         method: 'POST',
@@ -306,13 +282,33 @@ export async function uploadVideoToR2(file: File): Promise<{ success: boolean; u
         if (putRes.ok) {
           return { success: true, url: presign.url };
         }
+
+        console.error('Presigned upload failed:', await putRes.text());
+      } else {
+        console.error('Presign failed:', presign);
       }
     } catch (err) {
-      console.warn('Presigned upload failed, falling back to proxy');
+      console.warn('Presigned upload attempt failed, trying proxy upload...', err);
     }
-    
-    // Fallback: use proxy for large files
-    return { success: false, error: 'File too large. Please configure R2 CORS or contact support.' };
+
+    // Fallback to proxy upload for small/medium files (still subject to platform limits)
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'videos');
+
+    const response = await fetch('/api/upload/video-proxy', {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(300000),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || `Upload failed (${response.status})` };
+    }
+
+    return { success: true, url: data.url };
   } catch (error) {
     console.error('Video upload error:', error);
     return { success: false, error: 'Failed to upload video' };
