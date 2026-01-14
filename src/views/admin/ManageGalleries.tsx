@@ -16,7 +16,6 @@ import { getPhotos, addPhotos, deletePhoto as deletePhotoFromStore, getPhotosByE
 import { getCategories, getCategoryDisplayName } from '../../lib/categories-store';
 import { logActivity, getAdminEmail } from '../../lib/activity-log';
 import { uploadToR2 } from '../../lib/upload-helper';
-import { batchUploadToR2 } from '../../lib/batch-upload';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
@@ -421,64 +420,80 @@ export function ManageGalleries() {
     }
 
     try {
-      const uploadToast = toast.loading(`Preparing upload of ${photos.length} photos...`);
-      
-      // Use new batch upload system - direct to R2 with presigned URLs
-      const result = await batchUploadToR2(
-        photos.map(p => p.file),
-        {
-          folder: 'events',
-          concurrency: 6,
-          onProgress: (current, total) => {
-            setUploadProgress(prev => ({
-              ...prev,
-              [eventId]: { current, total }
-            }));
-            toast.loading(`Uploading ${current}/${total} photos...`, { id: uploadToast });
-          },
-          onFileComplete: (fileName, success) => {
-            if (!success) {
-              console.warn(`Failed: ${fileName}`);
-            }
-          }
-        }
-      );
+      setUploadProgress(prev => ({
+        ...prev,
+        [eventId]: { current: 0, total: photos.length }
+      }));
 
+      const uploadToast = toast.loading(`Uploading 0/${photos.length} photos...`);
+
+      // Upload photos in parallel batches (through API - no CORS issues)
+      const BATCH_SIZE = 6;
+      const r2UploadResults = [];
+      
+      for (let i = 0; i < photos.length; i += BATCH_SIZE) {
+        const batch = photos.slice(i, Math.min(i + BATCH_SIZE, photos.length));
+        
+        const batchResults = await Promise.allSettled(
+          batch.map(async (photo) => {
+            try {
+              const result = await uploadToR2(photo.file, 'events');
+              return { id: photo.id, result };
+            } catch (err) {
+              console.error(`Failed to upload ${photo.file.name}:`, err);
+              return { id: photo.id, result: { success: false, error: String(err) } };
+            }
+          })
+        );
+        
+        batchResults.forEach((promiseResult) => {
+          if (promiseResult.status === 'fulfilled') {
+            r2UploadResults.push(promiseResult.value);
+          }
+        });
+        
+        const current = Math.min(i + BATCH_SIZE, photos.length);
+        setUploadProgress(prev => ({
+          ...prev,
+          [eventId]: { current, total: photos.length }
+        }));
+        toast.loading(`Uploading ${current}/${photos.length} photos...`, { id: uploadToast });
+      }
+      
       toast.dismiss(uploadToast);
 
-      if (result.successful.length === 0) {
-        toast.error(`Failed to upload ${result.stats.failed} photos`);
+      const newPhotos = r2UploadResults
+        .filter(({ result }) => result.success && result.url)
+        .map(({ id, result }) => {
+          const uploadingPhoto = photos.find(p => p.id === id);
+          const width = uploadingPhoto?.width || 4;
+          const height = uploadingPhoto?.height || 3;
+          const orientation: 'portrait' | 'landscape' | 'square' = 
+            width > height ? 'landscape' : width < height ? 'portrait' : 'square';
+          
+          return {
+            id,
+            url: result.url!,
+            thumbnail: result.url!,
+            eventId: eventId,
+            supabaseEventId: event.supabaseId,
+            tags: [],
+            uploadedAt: new Date().toISOString(),
+            width,
+            height,
+            orientation,
+            fileSize: uploadingPhoto?.file.size || 0,
+            mimeType: uploadingPhoto?.file.type || 'image/jpeg',
+          };
+        });
+
+      if (newPhotos.length === 0) {
+        toast.error(`Failed to upload photos`);
         return;
       }
 
-      // Build photo objects with uploaded R2 URLs
-      const newPhotos = result.successful.map((uploadedFile) => {
-        const uploadingPhoto = photos.find(p => p.file.name === uploadedFile.fileName);
-        const width = uploadingPhoto?.width || 4;
-        const height = uploadingPhoto?.height || 3;
-        const orientation: 'portrait' | 'landscape' | 'square' = 
-          width > height ? 'landscape' : width < height ? 'portrait' : 'square';
-        
-        return {
-          id: uploadedFile.fileName,
-          url: uploadedFile.url,
-          thumbnail: uploadedFile.url, // Same as main image for now
-          eventId: eventId,
-          supabaseEventId: event.supabaseId,
-          tags: [],
-          uploadedAt: new Date().toISOString(),
-          width,
-          height,
-          orientation,
-          fileSize: uploadingPhoto?.file.size || 0,
-          mimeType: uploadingPhoto?.file.type || 'image/jpeg',
-        };
-      });
-
-      // Add photos to the store (syncs to Supabase)
       await addPhotos(newPhotos);
 
-      // Clear uploading photos and progress for this event
       setUploadingPhotos(prev => ({
         ...prev,
         [eventId]: []
@@ -490,7 +505,6 @@ export function ManageGalleries() {
         return newProg;
       });
 
-      // Update the photos cache
       setEventPhotosCache(prev => ({
         ...prev,
         [eventId]: [...(prev[eventId] || []), ...newPhotos]
