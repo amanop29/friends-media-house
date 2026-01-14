@@ -164,6 +164,11 @@ export default function RootLayout({
         {/* DNS prefetch and preconnect for faster image loading */}
         <link rel="dns-prefetch" href="https://pub-3f6e9022e56e4c97a0e76f6886a03ff4.r2.dev" />
         <link rel="preconnect" href="https://pub-3f6e9022e56e4c97a0e76f6886a03ff4.r2.dev" crossOrigin="anonymous" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/api/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/api/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/api/favicon-16x16.png" />
+        <link rel="manifest" href="/api/site.webmanifest" />
+        <link rel="icon" type="image/x-icon" href="/api/favicon.ico" />
       </head>
       <body className={`${inter.className} overflow-x-hidden min-h-screen`}>
         <NextTopLoader

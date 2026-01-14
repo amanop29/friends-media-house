@@ -1,3 +1,23 @@
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+// Fetch an object from R2 (returns { body, contentType } or null)
+export async function getR2Object(key: string): Promise<{ body: Buffer, contentType: string } | null> {
+  if (!s3Client || !isR2Configured) return null;
+  const bucketName = process.env.R2_BUCKET_NAME!;
+  const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+  try {
+    const res = await s3Client.send(command);
+    const stream = res.Body;
+    const contentType = res.ContentType || 'application/octet-stream';
+    // Convert stream to Buffer
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream as any) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return { body: Buffer.concat(chunks), contentType };
+  } catch (e) {
+    return null;
+  }
+}
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
