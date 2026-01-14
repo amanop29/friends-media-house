@@ -88,23 +88,16 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 lg:px-6 md:px-4 md:mt-4">
         <div className="flex items-center justify-between h-20 mt-4 mx-1 px-3 rounded-full backdrop-blur-lg bg-white/50 dark:bg-black/20 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/20 dark:border-white/10 md:mt-0 md:mx-0 md:px-8">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <motion.div
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center shadow-lg overflow-hidden"
-            >
-              {logo ? (
-                <img src={logo} alt="Logo" className="w-full h-full object-contain p-1" />
-              ) : (
-                <span className="text-white text-sm font-bold">FMH</span>
-              )}
-            </motion.div>
-            <span className="text-gray-900 dark:text-white tracking-wide font-medium group-hover:text-[#C5A572] transition-colors duration-200">
-              {settings.siteName}
-            </span>
+          {/* Logo (only show if uploaded, no circle, no text) */}
+          <Link href="/" className="flex items-center group">
+            {logo && (
+              <img 
+                src={logo} 
+                alt="Logo" 
+                className="h-20 max-h-[72px] w-auto object-contain px-2"
+                style={{ display: 'block' }}
+              />
+            )}
           </Link>
 
           {/* Desktop Navigation */}
