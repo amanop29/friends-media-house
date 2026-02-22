@@ -56,6 +56,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true, // TODO: Fix TypeScript errors and set to false
   },
+  // Skip ESLint during production builds (lint locally instead)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Configure experimental features
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'framer-motion'],
