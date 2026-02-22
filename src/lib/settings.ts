@@ -12,6 +12,8 @@ export interface SiteSettings {
   youtube: string;
   homeBannerUrl?: string;
   logoUrl?: string;
+  launchPageEnabled?: boolean;
+  launchPagePassword?: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -22,6 +24,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   address: 'Mumbai, Maharashtra 400011, India',
   instagram: '@friendsmediahouse_',
   youtube: '@friendsmediahouse',
+  launchPageEnabled: false,
+  launchPagePassword: '',
 };
 
 const SETTINGS_KEY = 'siteSettings';
