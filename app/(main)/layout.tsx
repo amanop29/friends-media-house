@@ -26,10 +26,11 @@ export default async function MainLayout({
               apikey: supabaseKey,
               Authorization: `Bearer ${supabaseKey}`,
             },
-            next: { revalidate: 30 },
+            cache: 'no-store',
           }
         );
         const data = await res.json();
+        console.log('[LaunchCheck]', JSON.stringify(data));
         if (data?.[0]?.value?.launchPageEnabled === true) {
           redirect('/launch');
         }
