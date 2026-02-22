@@ -4,6 +4,9 @@ import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { ScrollToTop } from '@/components/ScrollToTop';
 
+// Force this layout to run on every request — never serve from cache
+export const dynamic = 'force-dynamic';
+
 export default async function MainLayout({
   children,
 }: {
