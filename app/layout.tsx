@@ -115,7 +115,7 @@ export async function generateMetadata(): Promise<Metadata> {
           width: 1200,
           height: 630,
           alt: 'Friends Media House - Professional Event Photography & Videography',
-          type: 'image/png',
+          type: 'image/jpeg',
         },
       ],
     },
