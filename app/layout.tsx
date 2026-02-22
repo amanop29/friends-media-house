@@ -79,6 +79,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const ogImage = await getOGImage();
   const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID;
 
+  // Use the /api/og endpoint which generates a properly sized 1200x630 image
+  // This ensures the image is always under WhatsApp/social media size limits
+  const ogImageUrl = `${siteUrl}/api/og${ogImage ? `?banner=${encodeURIComponent(ogImage)}` : ''}`;
+
   return {
     metadataBase: new URL(siteUrl),
     title: {
@@ -105,18 +109,15 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: 'Friends Media House',
       title: 'Friends Media House | Professional Event Photography & Videography',
       description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
-      images: ogImage
-        ? [
-            {
-              url: ogImage,
-              width: 1200,
-              height: 630,
-              alt: 'Friends Media House - Professional Event Photography & Videography',
-              type: 'image/jpeg',
-              secureUrl: ogImage,
-            },
-          ]
-        : [],
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: 'Friends Media House - Professional Event Photography & Videography',
+          type: 'image/png',
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
@@ -124,14 +125,12 @@ export async function generateMetadata(): Promise<Metadata> {
       title: 'Friends Media House | Professional Event Photography & Videography',
       description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
       creator: '@friendsmediahouse',
-      images: ogImage
-        ? {
-            url: ogImage,
-            width: 1200,
-            height: 630,
-            alt: 'Friends Media House - Professional Event Photography & Videography',
-          }
-        : undefined,
+      images: {
+        url: ogImageUrl,
+        width: 1200,
+        height: 630,
+        alt: 'Friends Media House - Professional Event Photography & Videography',
+      },
     },
     robots: {
       index: true,
