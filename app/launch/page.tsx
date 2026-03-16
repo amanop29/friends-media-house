@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -36,6 +36,7 @@ export default function LaunchPage() {
   const [pwError, setPwError] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
   const [showPwForm, setShowPwForm] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +123,18 @@ export default function LaunchPage() {
   const activeLogo = logos[activeLogoIndex] || '';
   const canSwitchLogos = logos.length > 1;
 
+  useEffect(() => {
+    if (!showPwForm) return;
+
+    // On in-app browsers, the keyboard can overlap inputs unless we nudge the viewport.
+    const timer = window.setTimeout(() => {
+      passwordInputRef.current?.focus();
+      passwordInputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 140);
+
+    return () => window.clearTimeout(timer);
+  }, [showPwForm]);
+
   const handleManualLogoSwitch = () => {
     if (!canSwitchLogos) return;
     setActiveLogoIndex((prev) => (prev + 1) % logos.length);
@@ -130,7 +143,7 @@ export default function LaunchPage() {
   const pad = (n: number) => n.toString().padStart(2, '0');
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#060608]">
+    <div className="relative min-h-screen min-h-[100svh] w-full overflow-x-hidden overflow-y-auto bg-[#060608]">
       
       {/* Silk Shader Background */}
       <div className="absolute inset-0 opacity-60">
@@ -149,11 +162,11 @@ export default function LaunchPage() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(6,6,8,0.8)_100%)]" />
 
       {/* Content Layer */}
-      <div className="relative z-10 h-screen p-2 sm:p-3 flex flex-col">
+      <div className="relative z-10 min-h-[100svh] p-2 sm:p-3 flex flex-col">
         <div className="flex-1 flex flex-col w-full max-w-[1400px] mx-auto">
           
           {/* Bento Layout: Image Left + Content Right */}
-          <div className="grid lg:grid-cols-2 gap-3 animate-fade-in-up flex-1 h-full">
+          <div className="grid lg:grid-cols-2 gap-3 animate-fade-in-up flex-1 min-h-full">
             
             {/* Left — Glass Box with Centered Logo */}
             <SpotlightCard className="relative h-full min-h-[420px] rounded-[20px] overflow-hidden flex items-center justify-center bg-white/[0.03] backdrop-blur-xl border border-white/[0.06]">
@@ -329,7 +342,7 @@ export default function LaunchPage() {
                       <AnimatePresence>
                         <motion.form
                           onSubmit={handlePasswordSubmit}
-                          className="flex flex-col gap-3"
+                          className="flex flex-col gap-3 pb-[max(env(safe-area-inset-bottom),12px)]"
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0 }}
@@ -339,8 +352,13 @@ export default function LaunchPage() {
                           <div className="flex gap-2">
                             <input
                               type="password"
+                              ref={passwordInputRef}
                               value={pwInput}
                               onChange={(e) => { setPwInput(e.target.value); setPwError(''); }}
+                              onFocus={(e) => {
+                                // Ensure focused field is visible above the software keyboard.
+                                e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                              }}
                               placeholder="Password"
                               autoFocus
                               className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-lg px-4 py-2.5 text-white text-sm placeholder-white/20 focus:outline-none focus:border-[#C5A572]/50 transition-colors"

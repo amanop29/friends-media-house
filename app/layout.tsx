@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
 import { cache } from 'react';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -13,6 +13,13 @@ import '@/styles/globals.css';
 
 // Optimize metadata fetching - cache for 1 hour
 export const revalidate = 3600;
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+};
 
 const inter = Inter({ 
   subsets: ['latin'],
