@@ -107,7 +107,7 @@ export function EventDetail({ slug }: { slug?: string }) {
       const { done, value } = await reader.read();
       if (done) break;
       if (value) {
-        chunks.push(value.buffer.slice(0));
+        chunks.push(new Uint8Array(value));
         received += value.length;
         if (contentLength) {
           onProgress?.(Math.min(99, (received / contentLength) * 100));
@@ -117,7 +117,7 @@ export function EventDetail({ slug }: { slug?: string }) {
 
     onProgress?.(100);
     const type = response.headers.get('Content-Type') || fallbackType;
-    return new Blob(chunks as Uint8Array[], { type });
+    return new Blob(chunks, { type });
   };
 
   // Helper function to load image dimensions dynamically
