@@ -6,7 +6,9 @@ import { Toaster } from '@/components/ui/sonner';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
 import NextTopLoader from 'nextjs-toploader';
+import SplashCursor from '@/components/SplashCursor';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { getHomeBannerUrls } from '@/lib/settings';
 import '@/styles/globals.css';
 
 // Optimize metadata fetching - cache for 1 hour
@@ -57,12 +59,14 @@ const getOGImage = cache(async (): Promise<string | null> => {
 
     const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
 
-    if (!settings?.homeBannerUrl) {
+    const bannerUrls = getHomeBannerUrls(settings);
+
+    if (bannerUrls.length === 0) {
       return null;
     }
 
     // Ensure absolute URL
-    let imageUrl = settings.homeBannerUrl;
+    let imageUrl = bannerUrls[0];
     if (!imageUrl.startsWith('http')) {
       imageUrl = `${siteUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
     }
@@ -182,6 +186,7 @@ export default function RootLayout({
           shadow="0 0 10px #C5A572,0 0 5px #C5A572"
         />
         <ThemeProvider>
+          <SplashCursor />
           {children}
           <Toaster position="top-center" richColors />
           <SpeedInsights />

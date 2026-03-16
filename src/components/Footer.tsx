@@ -152,6 +152,10 @@ export function Footer() {
     );
   }
 
+  const footerLogos = [settings.logoUrl, settings.secondLogoUrl].filter(
+    (logoUrl): logoUrl is string => Boolean(logoUrl)
+  );
+
   const socialLinks = [
     {
       icon: Instagram,
@@ -186,18 +190,44 @@ export function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_0.9fr_0.9fr_1.5fr] gap-12">
             {/* Brand */}
             <div>
-              <Link href="/" className="flex items-center gap-3 mb-4 group">
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center"
-                >
-                  <span className="text-white">FMH</span>
-                </motion.div>
-                <span className="text-[#2B2B2B] dark:text-white group-hover:text-[#C5A572] transition-colors">
-                  {settings.siteName}
-                </span>
+              <Link href="/" className="group mb-4 block">
+                {footerLogos.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {footerLogos.map((logoUrl, index) => (
+                      <motion.div
+                        key={logoUrl}
+                        whileHover={{ scale: 1.04 }}
+                        transition={{ duration: 0.2 }}
+                        className="rounded-xl border border-[#2B2B2B]/10 dark:border-white/10 bg-[#2B2B2B]/5 dark:bg-white/[0.03] px-3 py-2"
+                      >
+                        <img
+                          src={logoUrl}
+                          alt={index === 0 ? `${settings.siteName} primary logo` : `${settings.siteName} secondary logo`}
+                          className="h-14 w-auto max-w-[180px] object-contain"
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      transition={{ duration: 0.2 }}
+                      className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center"
+                    >
+                      <span className="text-white">FMH</span>
+                    </motion.div>
+                    <span className="text-[#2B2B2B] dark:text-white group-hover:text-[#C5A572] transition-colors">
+                      {settings.siteName}
+                    </span>
+                  </div>
+                )}
               </Link>
+              {footerLogos.length > 0 && (
+                <p className="text-[#2B2B2B] dark:text-white mb-3">
+                  {settings.siteName}
+                </p>
+              )}
               <p className="text-[#707070] dark:text-[#A0A0A0] mb-6">
                 {settings.tagline}
               </p>

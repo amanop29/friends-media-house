@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Moon, Sun, Menu, X } from 'lucide-react';
+import { Moon, Sun, Menu, X, ArrowLeftRight } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from '../contexts/ThemeContext';
 import { Button } from './ui/button';
@@ -15,7 +15,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [logo, setLogo] = useState<string>('');
+  const [activeLogoIndex, setActiveLogoIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -24,17 +24,9 @@ export function Navbar() {
     setSettings(localSettings);
     
     // Set logo from local settings first
-    if (localSettings.logoUrl) {
-      setLogo(localSettings.logoUrl);
-    }
-    
     // Then fetch from Supabase to get latest
     fetchSettings().then(supabaseSettings => {
       setSettings(supabaseSettings);
-      // Update logo from Supabase settings
-      if (supabaseSettings.logoUrl) {
-        setLogo(supabaseSettings.logoUrl);
-      }
     });
     setMounted(true);
 
@@ -44,10 +36,6 @@ export function Navbar() {
 
     const handleSettingsUpdate = (event: CustomEvent) => {
       setSettings(event.detail);
-      // Also update logo when settings are updated
-      if (event.detail.logoUrl) {
-        setLogo(event.detail.logoUrl);
-      }
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -58,6 +46,30 @@ export function Navbar() {
       window.removeEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
     };
   }, []);
+
+  const logos = [settings?.logoUrl, settings?.secondLogoUrl].filter(
+    (logoUrl): logoUrl is string => Boolean(logoUrl)
+  );
+
+  useEffect(() => {
+    setActiveLogoIndex(0);
+
+    if (logos.length < 2) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveLogoIndex((prev) => (prev + 1) % logos.length);
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [logos.length]);
+
+  const activeLogo = logos[activeLogoIndex] || '';
+  const canSwitchLogos = logos.length > 1;
+
+  const handleManualLogoSwitch = () => {
+    if (!canSwitchLogos) return;
+    setActiveLogoIndex((prev) => (prev + 1) % logos.length);
+  };
 
   const isAdmin = pathname?.startsWith('/admin');
 
@@ -88,17 +100,40 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 lg:px-6 md:px-4 md:mt-4">
         <div className="flex items-center justify-between h-20 mt-4 mx-1 px-3 rounded-full backdrop-blur-lg bg-white/50 dark:bg-black/20 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] border border-white/20 dark:border-white/10 md:mt-0 md:mx-0 md:px-8">
-          {/* Logo (only show if uploaded, no circle, no text) */}
-          <Link href="/" className="flex items-center group">
-            {logo && (
-              <img 
-                src={logo} 
-                alt="Logo" 
-                className="h-20 max-h-[72px] w-auto object-contain px-2"
-                style={{ display: 'block' }}
-              />
+          {/* Auto-switching logo */}
+          <div className="flex items-center gap-1.5">
+            <Link href="/" className="flex items-center group">
+              <div className="inline-grid place-items-center px-2">
+                <AnimatePresence initial={false} mode="sync">
+                  {activeLogo && (
+                    <motion.img
+                      key={activeLogo}
+                      src={activeLogo}
+                      alt="Logo"
+                      className="col-start-1 row-start-1 h-20 max-h-[72px] w-auto object-contain"
+                      style={{ display: 'block' }}
+                      initial={{ opacity: 0, scale: 0.985, filter: 'blur(2px)' }}
+                      animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, scale: 1.015, filter: 'blur(2px)' }}
+                      transition={{ duration: 0.8, ease: 'easeInOut' }}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
+            </Link>
+
+            {canSwitchLogos && (
+              <button
+                type="button"
+                onClick={handleManualLogoSwitch}
+                className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8f8f] transition-colors hover:text-[#C5A572]"
+                title="Swap logo"
+                aria-label="Swap logo"
+              >
+                <ArrowLeftRight className="h-3 w-3" />
+              </button>
             )}
-          </Link>
+          </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">

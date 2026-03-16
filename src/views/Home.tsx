@@ -2,13 +2,13 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from "framer-motion";
-import { Camera, Film, Heart, Award, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from "framer-motion";
+import { Camera, Film, Heart, Award, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/button';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { getEvents } from '../lib/events-store';
-import { getSettings, fetchSettings, type SiteSettings } from '../lib/settings';
+import { getSettings, fetchSettings, getHomeBannerUrls, type SiteSettings } from '../lib/settings';
 import { supabase } from '../lib/supabase';
 
 // Lazy load FAQSection for better performance
@@ -29,7 +29,9 @@ interface FeaturedEvent {
 
 export function Home() {
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const [bannerImage, setBannerImage] = useState<string>('');
+  const [bannerImages, setBannerImages] = useState<string[]>([]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [visibleBannerIndex, setVisibleBannerIndex] = useState(0);
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [featuredEvents, setFeaturedEvents] = useState<FeaturedEvent[]>([]);
@@ -39,39 +41,42 @@ export function Home() {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
+  const preloadBannerImage = (url: string) => {
+    if (!url) return;
+
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = url;
+    link.fetchPriority = 'high';
+    document.head.appendChild(link);
+  };
+
   useEffect(() => {
     // Load settings from localStorage first for immediate render
     const localSettings = getSettings();
     setSettings(localSettings);
     
-    // Set banner from local settings first and preload it
-    if (localSettings.homeBannerUrl) {
-      setBannerImage(localSettings.homeBannerUrl);
-      
-      // Preload the banner image for faster loading
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.as = 'image';
-      link.href = localSettings.homeBannerUrl;
-      link.fetchPriority = 'high';
-      document.head.appendChild(link);
+    // Set banners from local settings first and preload them
+    const localBannerUrls = getHomeBannerUrls(localSettings);
+    if (localBannerUrls.length > 0) {
+      setBannerImages(localBannerUrls);
+      setActiveBannerIndex(0);
+      setVisibleBannerIndex(0);
+      setBannerLoaded(false);
+      localBannerUrls.forEach(preloadBannerImage);
     }
     
     // Then fetch from Supabase to get latest
     fetchSettings().then(supabaseSettings => {
       setSettings(supabaseSettings);
-      // Update banner from Supabase settings
-      if (supabaseSettings.homeBannerUrl && supabaseSettings.homeBannerUrl !== localSettings.homeBannerUrl) {
-        setBannerImage(supabaseSettings.homeBannerUrl);
-        setBannerLoaded(false); // Reset loaded state for new image
-        
-        // Preload the new banner image
-        const link = document.createElement('link');
-        link.rel = 'preload';
-        link.as = 'image';
-        link.href = supabaseSettings.homeBannerUrl;
-        link.fetchPriority = 'high';
-        document.head.appendChild(link);
+      const supabaseBannerUrls = getHomeBannerUrls(supabaseSettings);
+      if (supabaseBannerUrls.length > 0) {
+        setBannerImages(supabaseBannerUrls);
+        setActiveBannerIndex(0);
+        setVisibleBannerIndex(0);
+        setBannerLoaded(false);
+        supabaseBannerUrls.forEach(preloadBannerImage);
       }
     });
 
@@ -145,10 +150,11 @@ export function Home() {
 
     const handleSettingsUpdate = (event: CustomEvent) => {
       setSettings(event.detail);
-      // Also update banner when settings are updated
-      if (event.detail.homeBannerUrl) {
-        setBannerImage(event.detail.homeBannerUrl);
-      }
+      const updatedBannerUrls = getHomeBannerUrls(event.detail);
+      setBannerImages(updatedBannerUrls);
+      setActiveBannerIndex(0);
+      setVisibleBannerIndex(0);
+      setBannerLoaded(false);
     };
 
     const handleEventsUpdate = () => {
@@ -164,6 +170,60 @@ export function Home() {
       window.removeEventListener('eventsUpdated', handleEventsUpdate as EventListener);
     };
   }, []);
+
+  const activeBannerImage = bannerImages[activeBannerIndex] || '';
+  const visibleBannerImage = bannerImages[visibleBannerIndex] || '';
+
+  useEffect(() => {
+    if (!activeBannerImage) {
+      setBannerLoaded(true);
+      return;
+    }
+
+    let isCancelled = false;
+    const image = new window.Image();
+
+    const markLoaded = () => {
+      if (!isCancelled) {
+        setVisibleBannerIndex(activeBannerIndex);
+        setBannerLoaded(true);
+      }
+    };
+
+    image.onload = markLoaded;
+    image.onerror = markLoaded;
+    image.src = activeBannerImage;
+
+    if (image.complete) {
+      markLoaded();
+    }
+
+    return () => {
+      isCancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [activeBannerImage, activeBannerIndex]);
+
+  useEffect(() => {
+    if (bannerImages.length < 2) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveBannerIndex((prev) => (prev + 1) % bannerImages.length);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [bannerImages.length]);
+
+  const showPreviousBanner = () => {
+    if (bannerImages.length < 2) return;
+    setActiveBannerIndex((prev) => (prev - 1 + bannerImages.length) % bannerImages.length);
+  };
+
+  const showNextBanner = () => {
+    if (bannerImages.length < 2) return;
+    setActiveBannerIndex((prev) => (prev + 1) % bannerImages.length);
+  };
 
   const services = [
     {
@@ -216,27 +276,70 @@ export function Home() {
         {/* Background Image */}
         <div className="absolute inset-0">
           {/* Blur placeholder while loading */}
-          {!bannerLoaded && (
+          {!bannerLoaded && !visibleBannerImage && activeBannerImage && (
             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-pulse" />
           )}
           
-          {bannerImage && (
-            <img
-              src={bannerImage}
-              alt="Hero Banner"
-              className={`w-full h-full object-cover transition-opacity duration-700 ${
-                bannerLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              onLoad={() => setBannerLoaded(true)}
-              style={{ contentVisibility: 'auto' }}
-            />
-          )}
+          <AnimatePresence initial={false} mode="sync">
+            {visibleBannerImage && (
+              <motion.img
+                key={visibleBannerImage}
+                src={visibleBannerImage}
+                alt={`Hero Banner ${visibleBannerIndex + 1}`}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                initial={{ opacity: 0, scale: 1.03 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.9, ease: 'easeInOut' }}
+                onLoad={() => setBannerLoaded(true)}
+                style={{ contentVisibility: 'auto' }}
+              />
+            )}
+          </AnimatePresence>
           
           {/* Gradient overlay - fades from dark at top to page background at bottom */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-[#FAFAFA] dark:to-[#0F0F0F]" />
+
+          {bannerImages.length > 1 && (
+            <>
+              <div className="absolute inset-y-0 left-4 z-10 hidden items-center md:flex">
+                <button
+                  type="button"
+                  onClick={showPreviousBanner}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white backdrop-blur-md transition hover:border-[#C5A572]/60 hover:text-[#C5A572]"
+                  aria-label="Show previous banner"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="absolute inset-y-0 right-4 z-10 hidden items-center md:flex">
+                <button
+                  type="button"
+                  onClick={showNextBanner}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white backdrop-blur-md transition hover:border-[#C5A572]/60 hover:text-[#C5A572]"
+                  aria-label="Show next banner"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
+                {bannerImages.map((bannerUrl, index) => (
+                  <button
+                    key={bannerUrl}
+                    type="button"
+                    onClick={() => setActiveBannerIndex(index)}
+                    className={`h-2.5 rounded-full transition-all ${index === activeBannerIndex ? 'w-8 bg-[#C5A572]' : 'w-2.5 bg-white/55 hover:bg-white/80'}`}
+                    aria-label={`Show banner ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Hero Content */}

@@ -16,14 +16,15 @@ import {
   Users
 } from 'lucide-react';
 import { cn } from './ui/utils';
-import { GlassCard } from './GlassCard';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
+import { getSettings, type SiteSettings } from '../lib/settings';
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settings, setSettings] = useState<SiteSettings>(() => getSettings());
   const navDesktopRef = useRef<HTMLDivElement | null>(null);
   const navMobileRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,6 +48,19 @@ export function AdminSidebar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    const handleSettingsUpdate = (event: CustomEvent<SiteSettings>) => {
+      setSettings(event.detail);
+    };
+
+    setSettings(getSettings());
+    window.addEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
+    };
+  }, []);
+
   const handleLogout = () => {
     logout();
     // Clear session from localStorage directly as backup
@@ -67,14 +81,26 @@ export function AdminSidebar() {
     { name: 'Settings', path: '/admin/settings', icon: Settings },
   ];
 
+  const adminLogoUrl = settings.logoUrl || settings.secondLogoUrl;
+
+  const brandMark = adminLogoUrl ? (
+    <img
+      src={adminLogoUrl}
+      alt={`${settings.siteName} logo`}
+      className="h-10 w-auto max-w-[120px] object-contain"
+    />
+  ) : (
+    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center">
+      <span className="text-white text-sm">FMH</span>
+    </div>
+  );
+
   return (
     <>
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-16 backdrop-blur-lg bg-white/10 dark:bg-black/20 border-b border-white/20 dark:border-white/10 px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center">
-            <span className="text-white text-sm">FMH</span>
-          </div>
+          {brandMark}
           <span className="text-[#2B2B2B] dark:text-white">Admin</span>
         </div>
         <Button
@@ -93,9 +119,7 @@ export function AdminSidebar() {
           {/* Logo */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center">
-                <span className="text-white">FMH</span>
-              </div>
+              {brandMark}
               <span className="text-[#2B2B2B] dark:text-white">Admin</span>
             </div>
           </div>

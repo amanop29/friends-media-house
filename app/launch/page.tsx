@@ -7,7 +7,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getSettings, fetchSettings, getInstagramUrl, type SiteSettings } from '@/lib/settings';
-import { Instagram, Sparkles, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Instagram, Sparkles, Lock, ArrowRight, Loader2, ArrowLeftRight } from 'lucide-react';
 import SpotlightCard from '@/components/SpotlightCard';
 import ShinyText from '@/components/ShinyText';
 import BlurText from '@/components/BlurText';
@@ -24,6 +24,7 @@ interface TimeLeft {
 export default function LaunchPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<SiteSettings>(getSettings());
+  const [activeLogoIndex, setActiveLogoIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({
     days: 0,
@@ -67,6 +68,10 @@ export default function LaunchPage() {
     setMounted(true);
     fetchSettings().then(setSettings);
 
+    const handleSettingsUpdate = (event: CustomEvent<SiteSettings>) => {
+      setSettings(event.detail);
+    };
+
     const calculateTimeLeft = (): TimeLeft => {
       const now = new Date().getTime();
       const target = launchDate.getTime();
@@ -90,8 +95,37 @@ export default function LaunchPage() {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
 
-    return () => clearInterval(interval);
+    window.addEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('settingsUpdated', handleSettingsUpdate as EventListener);
+    };
   }, []);
+
+  const logos = [settings.logoUrl, settings.secondLogoUrl].filter(
+    (logoUrl): logoUrl is string => Boolean(logoUrl)
+  );
+
+  useEffect(() => {
+    setActiveLogoIndex(0);
+
+    if (logos.length < 2) return;
+
+    const intervalId = window.setInterval(() => {
+      setActiveLogoIndex((prev) => (prev + 1) % logos.length);
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [logos.length]);
+
+  const activeLogo = logos[activeLogoIndex] || '';
+  const canSwitchLogos = logos.length > 1;
+
+  const handleManualLogoSwitch = () => {
+    if (!canSwitchLogos) return;
+    setActiveLogoIndex((prev) => (prev + 1) % logos.length);
+  };
 
   const pad = (n: number) => n.toString().padStart(2, '0');
 
@@ -129,7 +163,7 @@ export default function LaunchPage() {
               <div className="absolute top-0 left-0 w-[1px] h-[60%] bg-gradient-to-b from-white/30 via-white/10 to-transparent" />
 
               {/* Logo — Centered & Large */}
-              {mounted && settings.logoUrl && (
+              {mounted && activeLogo && (
                 <div className="relative flex items-center justify-center w-full h-full">
                   {/* Ambient glow behind logo */}
                   <div className="absolute w-80 h-80 rounded-full bg-[#C5A572]/20 blur-[90px]" />
@@ -139,20 +173,40 @@ export default function LaunchPage() {
                     transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                   />
                   {/* Logo */}
-                  <motion.div
-                    className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 z-10"
-                    initial={{ opacity: 0, scale: 0.82 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 1.1, ease: [0.25, 0.4, 0.25, 1] }}
-                  >
-                    <Image
-                      src={settings.logoUrl}
-                      alt={settings.siteName}
-                      fill
-                      className="object-contain drop-shadow-[0_0_60px_rgba(197,165,114,0.9)]"
-                      priority
-                    />
-                  </motion.div>
+                  <div className="relative z-10 flex items-center gap-2">
+                    <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96">
+                      <AnimatePresence initial={false} mode="sync">
+                        <motion.div
+                          key={activeLogo}
+                          className="absolute inset-0"
+                          initial={{ opacity: 0, scale: 0.82, filter: 'blur(3px)' }}
+                          animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                          exit={{ opacity: 0, scale: 1.02, filter: 'blur(3px)' }}
+                          transition={{ duration: 0.85, ease: [0.25, 0.4, 0.25, 1] }}
+                        >
+                          <Image
+                            src={activeLogo}
+                            alt={settings.siteName}
+                            fill
+                            className="object-contain drop-shadow-[0_0_60px_rgba(197,165,114,0.9)]"
+                            priority
+                          />
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+
+                    {canSwitchLogos && (
+                      <button
+                        type="button"
+                        onClick={handleManualLogoSwitch}
+                        className="absolute bottom-8 right-8 z-20 flex h-6 w-6 items-center justify-center rounded-sm text-white/35 transition-colors hover:text-[#C5A572]"
+                        title="Swap logo"
+                        aria-label="Swap logo"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </SpotlightCard>

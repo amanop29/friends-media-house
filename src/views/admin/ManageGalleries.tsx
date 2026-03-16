@@ -137,27 +137,44 @@ export function ManageGalleries() {
     if (window.confirm(`Are you sure you want to delete "${eventTitle}"?`)) {
       const target = events.find(e => e.id === eventId);
       if (!target) return;
-      
-      // Show immediate feedback - deletion happens in background
-      toast.success('Event deleted successfully');
-      setEvents(events.filter(e => e.id !== eventId));
-      
-      // Delete everything in background (don't wait)
-      deleteEventFromStore(target).catch(err => {
-        console.error('Background deletion error:', err);
-        toast.error('Error cleaning up event files');
-      });
-      
-      // Log activity in background
-      logActivity({
-        entityType: 'event',
-        entityId: target.supabaseId || target.id,
-        action: 'delete',
-        description: `Deleted event "${eventTitle}"`,
-        adminEmail: getAdminEmail() || undefined,
-      }).catch(logErr => {
-        console.warn('Failed to log delete activity:', logErr);
-      });
+
+      const loadingToast = toast.loading('Deleting event and cleaning up files...');
+
+      try {
+        const deletionResult = await deleteEventFromStore(target);
+        setEvents(events.filter(e => e.id !== eventId));
+
+        if (deletionResult.success) {
+          toast.success('Event and all cloud files deleted successfully', { id: loadingToast });
+        } else if (
+          deletionResult.dbEventDeleted &&
+          deletionResult.dbPhotosDeleted &&
+          deletionResult.dbVideosDeleted &&
+          deletionResult.localEventDeleted &&
+          deletionResult.localPhotosDeleted &&
+          !deletionResult.r2CleanupSucceeded
+        ) {
+          toast.warning(
+            `Event deleted from database, but ${deletionResult.r2FailedFiles.length} R2 file(s) failed to delete.`,
+            { id: loadingToast }
+          );
+        } else {
+          toast.error('Event deletion was only partially completed. Check console for details.', { id: loadingToast });
+        }
+
+        logActivity({
+          entityType: 'event',
+          entityId: target.supabaseId || target.id,
+          action: 'delete',
+          description: `Deleted event "${eventTitle}"`,
+          adminEmail: getAdminEmail() || undefined,
+        }).catch(logErr => {
+          console.warn('Failed to log delete activity:', logErr);
+        });
+      } catch (err) {
+        console.error('Event deletion error:', err);
+        toast.error('Failed to delete event files completely', { id: loadingToast });
+      }
     }
   };
 

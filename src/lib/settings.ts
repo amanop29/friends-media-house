@@ -11,7 +11,9 @@ export interface SiteSettings {
   instagram: string;
   youtube: string;
   homeBannerUrl?: string;
+  homeBannerUrls?: string[];
   logoUrl?: string;
+  secondLogoUrl?: string;
   launchPageEnabled?: boolean;
   launchPagePassword?: string;
 }
@@ -30,21 +32,46 @@ export const DEFAULT_SETTINGS: SiteSettings = {
 
 const SETTINGS_KEY = 'siteSettings';
 
+function normalizeBannerUrls(settings: SiteSettings): SiteSettings {
+  const bannerUrls = Array.from(
+    new Set(
+      [
+        ...(Array.isArray(settings.homeBannerUrls) ? settings.homeBannerUrls : []),
+        settings.homeBannerUrl,
+      ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    )
+  );
+
+  return {
+    ...settings,
+    homeBannerUrls: bannerUrls,
+    homeBannerUrl: bannerUrls[0],
+  };
+}
+
+export function getHomeBannerUrls(settings: SiteSettings | null | undefined): string[] {
+  if (!settings) {
+    return [];
+  }
+
+  return normalizeBannerUrls(settings).homeBannerUrls || [];
+}
+
 export function getSettings(): SiteSettings {
   if (typeof window === 'undefined') {
-    return DEFAULT_SETTINGS;
+    return normalizeBannerUrls(DEFAULT_SETTINGS);
   }
 
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
     if (saved) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      return normalizeBannerUrls({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) });
     }
   } catch (error) {
     console.error('Error loading settings:', error);
   }
 
-  return DEFAULT_SETTINGS;
+  return normalizeBannerUrls(DEFAULT_SETTINGS);
 }
 
 /**
@@ -76,7 +103,7 @@ export async function fetchSettings(): Promise<SiteSettings> {
       const supabaseSettings = typeof data.value === 'string' 
         ? JSON.parse(data.value) 
         : data.value;
-      settings = { ...DEFAULT_SETTINGS, ...supabaseSettings };
+      settings = normalizeBannerUrls({ ...DEFAULT_SETTINGS, ...supabaseSettings });
       
       // Sync to localStorage
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -95,11 +122,13 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
   }
 
   try {
+    const normalizedSettings = normalizeBannerUrls(settings);
+
     // Save to localStorage first for immediate effect
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalizedSettings));
     
     // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: settings }));
+    window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: normalizedSettings }));
 
     // Sync to Supabase (best effort) - store all settings under 'site_config' key
     if (supabase) {
@@ -108,7 +137,7 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
         .upsert(
           { 
             key: 'site_config', 
-            value: settings, 
+            value: normalizedSettings, 
             description: 'Site-wide configuration settings',
             updated_at: new Date().toISOString()
           }, 

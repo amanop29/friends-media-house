@@ -57,9 +57,12 @@ export async function uploadToR2(
   folder: 'banners' | 'logos' | 'avatars' | 'events' | 'gallery' | 'reviews' | 'videos' | 'team' = 'gallery'
 ): Promise<UploadResult> {
   try {
-    // For large files (>4MB), use presigned URL to avoid 413 errors
+    // Use presigned uploads only for larger files to avoid request timeouts and 413 errors.
+    // Smaller files are faster through the direct POST endpoint.
     const fourMB = 4 * 1024 * 1024;
-    if (file.size > fourMB) {
+    const shouldUsePresignedUpload = file.size > fourMB;
+
+    if (shouldUsePresignedUpload) {
       // Get presigned URL
       const endpoint = ['banners', 'logos', 'avatars', 'reviews', 'team'].includes(folder)
         ? '/api/upload/public'
@@ -110,7 +113,7 @@ export async function uploadToR2(
     const response = await fetch(endpoint, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(180000),
     });
 
     if (!response.ok) {

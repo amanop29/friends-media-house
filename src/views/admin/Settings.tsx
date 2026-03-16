@@ -1,27 +1,30 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
-import { Save, Upload as UploadIcon, X, Image as ImageIcon, Lock, Eye, EyeOff, Loader2, Globe, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Save, Upload as UploadIcon, X, Image as ImageIcon, Lock, Eye, EyeOff, Loader2, Globe, ToggleLeft, ToggleRight, GripVertical } from 'lucide-react';
 import { GlassCard } from '../../components/GlassCard';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
-import { getSettings, saveSettings, fetchSettings, DEFAULT_SETTINGS, type SiteSettings } from '../../lib/settings';
+import { getSettings, saveSettings, fetchSettings, getHomeBannerUrls, DEFAULT_SETTINGS, type SiteSettings } from '../../lib/settings';
 import { compressAndUploadImage, uploadToR2Direct, deleteFromR2 } from '../../lib/upload-helper';
 
 export function Settings() {
   const [formData, setFormData] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [bannerImage, setBannerImage] = useState<string>('');
-  const [bannerPreview, setBannerPreview] = useState<string>('');
+  const [bannerImages, setBannerImages] = useState<string[]>([]);
+  const [draggedBannerIndex, setDraggedBannerIndex] = useState<number | null>(null);
   const [logoImage, setLogoImage] = useState<string>('');
   const [logoPreview, setLogoPreview] = useState<string>('');
+  const [secondLogoImage, setSecondLogoImage] = useState<string>('');
+  const [secondLogoPreview, setSecondLogoPreview] = useState<string>('');
   
   // Refs for file inputs to reset them after upload
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
   const logoInputRef = React.useRef<HTMLInputElement>(null);
+  const secondLogoInputRef = React.useRef<HTMLInputElement>(null);
   
   // Admin credentials state
   const [adminEmail, setAdminEmail] = useState<string>('');
@@ -38,26 +41,28 @@ export function Settings() {
     setFormData(savedSettings);
     
     // Set banner and logo from local settings first
-    if (savedSettings.homeBannerUrl) {
-      setBannerImage(savedSettings.homeBannerUrl);
-      setBannerPreview(savedSettings.homeBannerUrl);
-    }
+    setBannerImages(getHomeBannerUrls(savedSettings));
     if (savedSettings.logoUrl) {
       setLogoImage(savedSettings.logoUrl);
       setLogoPreview(savedSettings.logoUrl);
+    }
+    if (savedSettings.secondLogoUrl) {
+      setSecondLogoImage(savedSettings.secondLogoUrl);
+      setSecondLogoPreview(savedSettings.secondLogoUrl);
     }
     
     // Then fetch from Supabase to get latest
     fetchSettings().then(settings => {
       setFormData(settings);
       // Update banner and logo from Supabase settings
-      if (settings.homeBannerUrl) {
-        setBannerImage(settings.homeBannerUrl);
-        setBannerPreview(settings.homeBannerUrl);
-      }
+      setBannerImages(getHomeBannerUrls(settings));
       if (settings.logoUrl) {
         setLogoImage(settings.logoUrl);
         setLogoPreview(settings.logoUrl);
+      }
+      if (settings.secondLogoUrl) {
+        setSecondLogoImage(settings.secondLogoUrl);
+        setSecondLogoPreview(settings.secondLogoUrl);
       }
     });
     
@@ -175,85 +180,53 @@ export function Settings() {
   };
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    console.log('Banner upload started:', { 
-      fileName: file.name, 
-      fileSize: file.size, 
-      fileType: file.type 
-    });
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
-      if (bannerInputRef.current) bannerInputRef.current.value = '';
-      return;
-    }
-
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error('File too large. Maximum size is 10MB.');
-      if (bannerInputRef.current) bannerInputRef.current.value = '';
-      return;
-    }
-
-    // Show loading toast
-    const loadingToast = toast.loading('Uploading banner image...');
-
-    try {
-      // Store previous banner URL for deletion
-      const previousBannerUrl = bannerImage;
-
-      console.log('Starting compression and upload...');
-      // Upload to R2
-      const result = await compressAndUploadImage(file, 'banners', 5);
-      
-      console.log('Upload result:', result);
-      
-      if (!result.success || !result.url) {
-        console.error('Upload failed:', result.error);
-        toast.error(result.error || 'Failed to upload banner', { id: loadingToast });
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please upload image files only');
         if (bannerInputRef.current) bannerInputRef.current.value = '';
         return;
       }
 
-      // Delete previous banner from R2 if exists
-      if (previousBannerUrl && previousBannerUrl.startsWith('http')) {
-        console.log('🗑️  Deleting previous banner:', previousBannerUrl);
-        const deleted = await deleteFromR2(previousBannerUrl);
-        if (deleted) {
-          console.log('✅ Previous banner deleted successfully');
-        } else {
-          console.warn('⚠️  Failed to delete previous banner, but continuing with upload');
-        }
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast.error('Each banner must be 10MB or smaller.');
+        if (bannerInputRef.current) bannerInputRef.current.value = '';
+        return;
       }
+    }
 
-      // Save URL to state and Supabase settings
-      const bannerUrl = result.url;
-      setBannerPreview(bannerUrl);
-      setBannerImage(bannerUrl);
-      
-      // Update formData and save to Supabase
-      const updatedSettings = { ...formData, homeBannerUrl: bannerUrl };
-      setFormData(updatedSettings);
-      await saveSettings(updatedSettings);
-      
-      console.log('Banner uploaded successfully:', bannerUrl);
-      toast.success('Banner image uploaded successfully!', { id: loadingToast });
-      
-      // Reset file input
+    const loadingToast = toast.loading(`Uploading ${files.length} banner${files.length > 1 ? 's' : ''}...`);
+
+    try {
+      const uploadResults = await Promise.all(
+        files.map(async (file) => {
+          const result = await compressAndUploadImage(file, 'banners', 5);
+
+          if (!result.success || !result.url) {
+            throw new Error(result.error || `Failed to upload ${file.name}`);
+          }
+
+          return result.url;
+        })
+      );
+
+      const updatedBannerUrls = [...bannerImages, ...uploadResults];
+      await persistBannerImages(updatedBannerUrls);
+
+      toast.success('Banner images uploaded successfully!', { id: loadingToast });
       if (bannerInputRef.current) bannerInputRef.current.value = '';
     } catch (error) {
       console.error('Banner upload error:', error);
-      toast.error('Failed to upload banner image', { id: loadingToast });
+      toast.error(error instanceof Error ? error.message : 'Failed to upload banner images', { id: loadingToast });
       if (bannerInputRef.current) bannerInputRef.current.value = '';
     }
   };
 
-  const handleRemoveBanner = async () => {
-    if (!bannerImage) {
+  const handleRemoveBanner = async (bannerUrl: string) => {
+    if (!bannerUrl) {
       toast.error('No banner to remove');
       return;
     }
@@ -265,27 +238,60 @@ export function Settings() {
 
     try {
       // Delete from R2 if exists
-      if (bannerImage.startsWith('http')) {
-        console.log('🗑️  Deleting banner from R2:', bannerImage);
-        const deleted = await deleteFromR2(bannerImage);
+      if (bannerUrl.startsWith('http')) {
+        console.log('🗑️  Deleting banner from R2:', bannerUrl);
+        const deleted = await deleteFromR2(bannerUrl);
         if (!deleted) {
           console.warn('⚠️  Failed to delete banner from R2');
           toast.warning('Banner removed from site, but failed to delete from storage', { id: loadingToast });
         }
       }
 
-      setBannerImage('');
-      setBannerPreview('');
-      
-      // Update formData and save to Supabase
-      const updatedSettings = { ...formData, homeBannerUrl: undefined };
-      setFormData(updatedSettings);
-      await saveSettings(updatedSettings);
+      const updatedBannerUrls = bannerImages.filter((imageUrl) => imageUrl !== bannerUrl);
+      await persistBannerImages(updatedBannerUrls);
       
       toast.success('Banner image removed successfully!', { id: loadingToast });
     } catch (error) {
       console.error('Error removing banner:', error);
       toast.error('Failed to remove banner', { id: loadingToast });
+    }
+  };
+
+  const persistBannerImages = async (updatedBannerUrls: string[]) => {
+    setBannerImages(updatedBannerUrls);
+
+    const updatedSettings = {
+      ...formData,
+      homeBannerUrls: updatedBannerUrls,
+      homeBannerUrl: updatedBannerUrls[0],
+    };
+
+    setFormData(updatedSettings);
+    await saveSettings(updatedSettings);
+  };
+
+  const handleBannerDragStart = (index: number) => {
+    setDraggedBannerIndex(index);
+  };
+
+  const handleBannerDrop = async (targetIndex: number) => {
+    if (draggedBannerIndex === null || draggedBannerIndex === targetIndex) {
+      setDraggedBannerIndex(null);
+      return;
+    }
+
+    const reorderedBannerUrls = [...bannerImages];
+    const [movedBanner] = reorderedBannerUrls.splice(draggedBannerIndex, 1);
+    reorderedBannerUrls.splice(targetIndex, 0, movedBanner);
+
+    try {
+      await persistBannerImages(reorderedBannerUrls);
+      toast.success('Banner order updated');
+    } catch (error) {
+      console.error('Error reordering banners:', error);
+      toast.error('Failed to update banner order');
+    } finally {
+      setDraggedBannerIndex(null);
     }
   };
 
@@ -382,6 +388,92 @@ export function Settings() {
     } catch (error) {
       console.error('Error removing logo:', error);
       toast.error('Failed to remove logo', { id: loadingToast });
+    }
+  };
+
+  const handleSecondLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload an image file (JPG, PNG, WebP, GIF, or SVG)');
+      if (secondLogoInputRef.current) secondLogoInputRef.current.value = '';
+      return;
+    }
+
+    const loadingToast = toast.loading('Uploading second logo...');
+
+    try {
+      const previousSecondLogoUrl = secondLogoImage;
+
+      let result;
+      if (file.type === 'image/svg+xml') {
+        result = await uploadToR2Direct(file, 'logos');
+      } else {
+        result = await compressAndUploadImage(file, 'logos', 2);
+      }
+
+      if (!result.success || !result.url) {
+        toast.error(result.error || 'Failed to upload second logo', { id: loadingToast });
+        if (secondLogoInputRef.current) secondLogoInputRef.current.value = '';
+        return;
+      }
+
+      if (previousSecondLogoUrl && previousSecondLogoUrl.startsWith('http')) {
+        const deleted = await deleteFromR2(previousSecondLogoUrl);
+        if (!deleted) {
+          console.warn('Failed to delete previous second logo, but continuing with upload');
+        }
+      }
+
+      const secondLogoUrl = result.url;
+      setSecondLogoPreview(secondLogoUrl);
+      setSecondLogoImage(secondLogoUrl);
+
+      const updatedSettings = { ...formData, secondLogoUrl };
+      setFormData(updatedSettings);
+      await saveSettings(updatedSettings);
+
+      toast.success('Second logo uploaded successfully!', { id: loadingToast });
+      if (secondLogoInputRef.current) secondLogoInputRef.current.value = '';
+    } catch (error) {
+      console.error('Second logo upload error:', error);
+      toast.error('Failed to upload second logo', { id: loadingToast });
+      if (secondLogoInputRef.current) secondLogoInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveSecondLogo = async () => {
+    if (!secondLogoImage) {
+      toast.error('No second logo to remove');
+      return;
+    }
+
+    const confirmDelete = window.confirm('Are you sure you want to remove the second logo?');
+    if (!confirmDelete) return;
+
+    const loadingToast = toast.loading('Removing second logo...');
+
+    try {
+      if (secondLogoImage.startsWith('http')) {
+        const deleted = await deleteFromR2(secondLogoImage);
+        if (!deleted) {
+          toast.warning('Second logo removed from site, but failed to delete from storage', { id: loadingToast });
+        }
+      }
+
+      setSecondLogoImage('');
+      setSecondLogoPreview('');
+
+      const updatedSettings = { ...formData, secondLogoUrl: undefined };
+      setFormData(updatedSettings);
+      await saveSettings(updatedSettings);
+
+      toast.success('Second logo removed successfully!', { id: loadingToast });
+    } catch (error) {
+      console.error('Error removing second logo:', error);
+      toast.error('Failed to remove second logo', { id: loadingToast });
     }
   };
 
@@ -542,27 +634,50 @@ export function Settings() {
             <div className="space-y-4">
               <div>
                 <label className="block text-[#2B2B2B] dark:text-white mb-2">
-                  Hero Banner Image
+                  Hero Banner Images
                 </label>
                 <p className="text-sm text-[#707070] dark:text-[#A0A0A0] mb-4">
-                  Upload a high-resolution image (recommended: 1920x1080px, max 5MB)
+                  Upload multiple high-resolution images for the home page carousel (recommended: 1920x1080px each, max 10MB per image).
+                </p>
+                <p className="text-xs text-[#707070] dark:text-[#A0A0A0] mb-4">
+                  You can select multiple files at once. Drag banner cards below to reorder them. The first banner is used first in the home carousel and for social preview.
                 </p>
 
                 {/* Preview */}
-                {bannerPreview && (
-                  <div className="relative mb-4 rounded-lg overflow-hidden border-2 border-[#C5A572]/30">
-                    <img
-                      src={bannerPreview}
-                      alt="Banner Preview"
-                      className="w-full h-48 object-cover"
-                    />
-                    <button
-                      onClick={handleRemoveBanner}
-                      className="absolute top-2 right-2 p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
-                      title="Remove banner"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                {bannerImages.length > 0 && (
+                  <div className="mb-4 grid gap-4 sm:grid-cols-2">
+                    {bannerImages.map((bannerUrl, index) => (
+                      <div
+                        key={bannerUrl}
+                        draggable
+                        onDragStart={() => handleBannerDragStart(index)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => void handleBannerDrop(index)}
+                        onDragEnd={() => setDraggedBannerIndex(null)}
+                        className={`relative rounded-lg overflow-hidden border-2 transition ${draggedBannerIndex === index ? 'border-[#C5A572] opacity-70' : 'border-[#C5A572]/30'}`}
+                      >
+                        <img
+                          src={bannerUrl}
+                          alt={`Banner Preview ${index + 1}`}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute left-2 bottom-2 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-xs text-white cursor-grab active:cursor-grabbing">
+                          <GripVertical className="w-3 h-3" />
+                          Drag to reorder
+                        </div>
+                        <div className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-xs text-white">
+                          {index === 0 ? 'Banner 1 • Primary' : `Banner ${index + 1}`}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBanner(bannerUrl)}
+                          className="absolute top-2 right-2 p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+                          title="Remove banner"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -574,13 +689,14 @@ export function Settings() {
                   >
                     <UploadIcon className="w-5 h-5 text-[#C5A572]" />
                     <span className="text-[#2B2B2B] dark:text-white">
-                      {bannerPreview ? 'Change Banner' : 'Upload Banner'}
+                      {bannerImages.length > 0 ? 'Add More / Upload Multiple Banners' : 'Upload Multiple Banners'}
                     </span>
                   </label>
                   <input
                     id="bannerUpload"
                     type="file"
                     accept="image/*"
+                    multiple
                     className="hidden"
                     ref={bannerInputRef}
                     onChange={handleBannerUpload}
@@ -598,8 +714,11 @@ export function Settings() {
 
             <div>
               <label className="block text-[#2B2B2B] dark:text-white mb-2">
-                Upload Logo
+                Primary Logo
               </label>
+              <p className="text-sm text-[#707070] dark:text-[#A0A0A0] mb-4">
+                Used across the site footer and as the first logo in the navbar switcher.
+              </p>
               <div className="space-y-4">
                 {logoPreview && (
                   <div className="relative inline-block">
@@ -634,6 +753,52 @@ export function Settings() {
                     ref={logoInputRef}
                     onChange={handleLogoUpload}
                     className="hidden" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <label className="block text-[#2B2B2B] dark:text-white mb-2">
+                Secondary Logo
+              </label>
+              <p className="text-sm text-[#707070] dark:text-[#A0A0A0] mb-4">
+                Shown alongside the primary logo in the footer and auto-switches in the navbar every 3 seconds.
+              </p>
+              <div className="space-y-4">
+                {secondLogoPreview && (
+                  <div className="relative inline-block">
+                    <img
+                      src={secondLogoPreview}
+                      alt="Second Logo Preview"
+                      className="h-20 w-auto object-contain rounded-lg border-2 border-[#C5A572]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveSecondLogo}
+                      className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-4">
+                  <label
+                    htmlFor="secondLogoUpload"
+                    className="flex items-center gap-3 px-6 py-3 rounded-lg backdrop-blur-lg bg-white/10 dark:bg-black/20 border-2 border-dashed border-black/20 dark:border-white/10 cursor-pointer hover:border-[#C5A572] transition-colors"
+                  >
+                    <UploadIcon className="w-5 h-5 text-[#C5A572]" />
+                    <span className="text-[#2B2B2B] dark:text-white">
+                      Choose Second Logo File
+                    </span>
+                  </label>
+                  <input
+                    id="secondLogoUpload"
+                    type="file"
+                    accept="image/*,.svg,image/svg+xml"
+                    ref={secondLogoInputRef}
+                    onChange={handleSecondLogoUpload}
+                    className="hidden"
                   />
                 </div>
               </div>
