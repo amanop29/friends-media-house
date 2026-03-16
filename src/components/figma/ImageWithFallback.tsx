@@ -12,8 +12,9 @@ interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElemen
 export function ImageWithFallback(props: ImageWithFallbackProps) {
   const [didError, setDidError] = useState(false)
 
-  const handleError = () => {
+  const handleError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setDidError(true)
+    props.onError?.(event)
   }
 
   const { src, alt, style, className, onLoad, eager, loading, fallback, ...rest } = props

@@ -55,6 +55,8 @@ export function EventDetail({ slug }: { slug?: string }) {
   const [imageLoadingStates, setImageLoadingStates] = useState<Map<string, boolean>>(new Map());
   const [photoDimensions, setPhotoDimensions] = useState<Map<string, { width: number; height: number }>>(new Map());
   const [downloadQueue, setDownloadQueue] = useState<DownloadJob[]>([]);
+  const [isCoverImageLoaded, setIsCoverImageLoaded] = useState(false);
+  const [didCoverImageFail, setDidCoverImageFail] = useState(false);
 
   const runDownloadJob = (label: string, task: (progress: (value: number) => void) => Promise<void>) => {
     const id = crypto.randomUUID();
@@ -249,6 +251,8 @@ export function EventDetail({ slug }: { slug?: string }) {
       }
       
       if (currentEvent) {
+        setIsCoverImageLoaded(false);
+        setDidCoverImageFail(false);
         setEvent(currentEvent);
         
         // Get the Supabase event ID to query photos
@@ -745,6 +749,14 @@ export function EventDetail({ slug }: { slug?: string }) {
                 src={event?.coverImage}
                 alt={event?.title}
                 className="w-full h-full object-cover"
+                onLoad={() => {
+                  setIsCoverImageLoaded(true);
+                  setDidCoverImageFail(false);
+                }}
+                onError={() => {
+                  setDidCoverImageFail(true);
+                  setIsCoverImageLoaded(false);
+                }}
                 fallback={(
                   <EventCoverPlaceholder
                     title={event?.title || 'Event'}
@@ -757,7 +769,7 @@ export function EventDetail({ slug }: { slug?: string }) {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                {event?.coverImage ? (
+                {event?.coverImage && isCoverImageLoaded && !didCoverImageFail ? (
                   <h1 className="text-white text-4xl md:text-5xl mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
                     {event?.title}
                   </h1>
@@ -803,7 +815,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                   className="!bg-[#C5A572] hover:!bg-[#B39563] !text-white rounded-full gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  <span className="hidden sm:inline">Select Photos</span>
+                  <span className="text-sm">Select<span className="hidden sm:inline"> Photos</span></span>
                 </Button>
                 <Button 
                   onClick={shareAlbum}
@@ -811,7 +823,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                   className="rounded-full gap-2 border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white"
                 >
                   <Share2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Share Album</span>
+                  <span className="text-sm">Share<span className="hidden sm:inline"> Album</span></span>
                 </Button>
               </>
             ) : (
