@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface ColorRGB {
@@ -187,8 +187,18 @@ export default function SplashCursor({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pathname = usePathname();
   const refreshFnRef = useRef<(() => void) | null>(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [hasDeviceCheck, setHasDeviceCheck] = useState(false);
 
   useEffect(() => {
+    const mobile = window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
+    setIsMobileDevice(mobile);
+    setHasDeviceCheck(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasDeviceCheck || isMobileDevice) return undefined;
+
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
@@ -1177,6 +1187,8 @@ export default function SplashCursor({
       // The browser cleans up GPU resources automatically when the page unloads.
     };
   }, [
+    hasDeviceCheck,
+    isMobileDevice,
     SIM_RESOLUTION,
     DYE_RESOLUTION,
     CAPTURE_RESOLUTION,
@@ -1195,6 +1207,8 @@ export default function SplashCursor({
 
   // On client-side navigation, trigger a fresh splash without reinitialising the WebGL context
   useEffect(() => {
+    if (!hasDeviceCheck || isMobileDevice) return undefined;
+
     let raf2 = 0;
     const raf1 = window.requestAnimationFrame(() => {
       raf2 = window.requestAnimationFrame(() => {
@@ -1205,7 +1219,11 @@ export default function SplashCursor({
       window.cancelAnimationFrame(raf1);
       window.cancelAnimationFrame(raf2);
     };
-  }, [pathname]);
+  }, [pathname, hasDeviceCheck, isMobileDevice]);
+
+  if (!hasDeviceCheck || isMobileDevice) {
+    return null;
+  }
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30" aria-hidden="true">
