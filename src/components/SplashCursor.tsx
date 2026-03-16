@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface ColorRGB {
   r: number;
@@ -184,10 +185,14 @@ export default function SplashCursor({
   TRANSPARENT = true,
 }: SplashCursorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pathname = usePathname();
+  const refreshFnRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
+
+    const isTouchDevice = window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
 
     let animationFrameId = 0;
     let pointers: PointerState[] = [pointerPrototype()];
@@ -198,16 +203,16 @@ export default function SplashCursor({
     let pressure: DoubleFBO;
 
     const config = {
-      SIM_RESOLUTION,
-      DYE_RESOLUTION,
+      SIM_RESOLUTION: isTouchDevice ? Math.min(SIM_RESOLUTION, 96) : SIM_RESOLUTION,
+      DYE_RESOLUTION: isTouchDevice ? Math.min(DYE_RESOLUTION, 512) : DYE_RESOLUTION,
       CAPTURE_RESOLUTION,
-      DENSITY_DISSIPATION,
-      VELOCITY_DISSIPATION,
+      DENSITY_DISSIPATION: isTouchDevice ? Math.max(DENSITY_DISSIPATION, 4.8) : DENSITY_DISSIPATION,
+      VELOCITY_DISSIPATION: isTouchDevice ? Math.max(VELOCITY_DISSIPATION, 3.1) : VELOCITY_DISSIPATION,
       PRESSURE,
       PRESSURE_ITERATIONS,
-      CURL,
-      SPLAT_RADIUS,
-      SPLAT_FORCE,
+      CURL: isTouchDevice ? Math.min(CURL, 1.5) : CURL,
+      SPLAT_RADIUS: isTouchDevice ? Math.min(SPLAT_RADIUS, 0.14) : SPLAT_RADIUS,
+      SPLAT_FORCE: isTouchDevice ? Math.min(SPLAT_FORCE, 2200) : SPLAT_FORCE,
       SHADING,
       COLOR_UPDATE_SPEED,
       BACK_COLOR,
@@ -1093,6 +1098,27 @@ export default function SplashCursor({
     initFramebuffers();
     updateFrame();
 
+    const refreshAfterNavigation = () => {
+      resizeCanvas();
+      initFramebuffers();
+
+      const pointer = pointers[0];
+      updatePointerDownData(
+        pointer,
+        -1,
+        scaleByPixelRatio(window.innerWidth * 0.5),
+        scaleByPixelRatio(window.innerHeight * 0.35)
+      );
+      clickSplat(pointer);
+      updatePointerUpData(pointer);
+    };
+
+    refreshFnRef.current = refreshAfterNavigation;
+
+    const refreshFrameId = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(refreshAfterNavigation);
+    });
+
     const handleMouseDown = (event: MouseEvent) => {
       const pointer = pointers[0];
       updatePointerDownData(pointer, -1, scaleByPixelRatio(event.clientX), scaleByPixelRatio(event.clientY));
@@ -1135,6 +1161,8 @@ export default function SplashCursor({
     window.addEventListener('resize', handleResize);
 
     return () => {
+      refreshFnRef.current = null;
+      window.cancelAnimationFrame(refreshFrameId);
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
@@ -1143,8 +1171,10 @@ export default function SplashCursor({
       window.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('resize', handleResize);
       pointers = [pointerPrototype()];
-      const extension = gl.getExtension('WEBGL_lose_context');
-      extension?.loseContext();
+      // Do NOT call loseContext() here — this component lives in the root layout and
+      // never truly unmounts during navigation. Calling loseContext() would permanently
+      // destroy the WebGL context on the same canvas, breaking all subsequent renders.
+      // The browser cleans up GPU resources automatically when the page unloads.
     };
   }, [
     SIM_RESOLUTION,
@@ -1163,8 +1193,22 @@ export default function SplashCursor({
     TRANSPARENT,
   ]);
 
+  // On client-side navigation, trigger a fresh splash without reinitialising the WebGL context
+  useEffect(() => {
+    let raf2 = 0;
+    const raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        refreshFnRef.current?.();
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, [pathname]);
+
   return (
-    <div className="pointer-events-none fixed inset-0 z-30 hidden md:block" aria-hidden="true">
+    <div className="pointer-events-none fixed inset-0 z-30" aria-hidden="true">
       <canvas ref={canvasRef} id="fluid" className="block h-screen w-screen" />
     </div>
   );

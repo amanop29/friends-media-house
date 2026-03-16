@@ -6,6 +6,7 @@ import { Calendar, MapPin, Image as ImageIcon, Video } from 'lucide-react';
 import { motion } from "framer-motion";
 import { GlassCard } from './GlassCard';
 import { Event } from '../lib/mock-data';
+import { EventCoverPlaceholder } from './EventCoverPlaceholder';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { getPhotosByEvent } from '../lib/photos-store';
 
@@ -19,6 +20,13 @@ export function EventCard({ event }: EventCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const router = useRouter();
   const href = `/events/${event.slug || event.id}`;
+  const eventCoverFallback = (
+    <EventCoverPlaceholder
+      title={event.title}
+      subtitle={event.coupleNames}
+      className="h-full w-full"
+    />
+  );
 
   useEffect(() => {
     // Use counts from event object if available (from Supabase)
@@ -55,7 +63,7 @@ export function EventCard({ event }: EventCardProps) {
       >
         <GlassCard hover className="overflow-hidden group">
           <div className="relative h-64 overflow-hidden">
-            {!imageLoaded && (
+            {event.coverImage && !imageLoaded && (
               <div className="absolute inset-0 z-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer bg-[length:200%_100%]" />
             )}
             <ImageWithFallback
@@ -63,6 +71,7 @@ export function EventCard({ event }: EventCardProps) {
               alt={event.title}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               onLoad={() => setImageLoaded(true)}
+              fallback={eventCoverFallback}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="absolute top-4 right-4">

@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Calendar, MapPin, Download, Share2, Heart, X, ChevronLeft, ChevronRight, MessageCircle, CheckCircle2, Image, Video } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/button';
+import { EventCoverPlaceholder } from '../components/EventCoverPlaceholder';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { PhotoComments } from '../components/PhotoComments';
 import { ViewModeToggle, ViewMode, Orientation } from '../components/ViewModeToggle';
@@ -744,12 +745,23 @@ export function EventDetail({ slug }: { slug?: string }) {
                 src={event?.coverImage}
                 alt={event?.title}
                 className="w-full h-full object-cover"
+                fallback={(
+                  <EventCoverPlaceholder
+                    title={event?.title || 'Event'}
+                    subtitle={event?.coupleNames}
+                    className="h-full w-full"
+                    titleClassName="text-4xl md:text-5xl"
+                    subtitleClassName="text-white/80"
+                  />
+                )}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <h1 className="text-white text-4xl md:text-5xl mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
-                  {event?.title}
-                </h1>
+                {event?.coverImage ? (
+                  <h1 className="text-white text-4xl md:text-5xl mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
+                    {event?.title}
+                  </h1>
+                ) : null}
                 <div className="flex flex-wrap gap-6 text-white/90">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-5 h-5" />

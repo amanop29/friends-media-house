@@ -6,6 +6,7 @@ import { GlassCard } from '../../components/GlassCard';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Progress } from '../../components/ui/progress';
+import { EventCoverPlaceholder } from '../../components/EventCoverPlaceholder';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
 import { EditEventModal } from '../../components/EditEventModal';
 import { AdminTableSkeleton } from '../../components/SkeletonComponents';
@@ -610,6 +611,13 @@ export function ManageGalleries() {
                             src={event.coverImage}
                             alt={event.title}
                             className="w-full h-full object-cover"
+                            fallback={(
+                              <EventCoverPlaceholder
+                                title={event.title}
+                                className="h-full w-full"
+                                compact
+                              />
+                            )}
                           />
                         </div>
 

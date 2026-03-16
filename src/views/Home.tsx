@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Film, Heart, Award, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/button';
+import { EventCoverPlaceholder } from '../components/EventCoverPlaceholder';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { getEvents } from '../lib/events-store';
 import { getSettings, fetchSettings, getHomeBannerUrls, type SiteSettings } from '../lib/settings';
@@ -422,7 +423,7 @@ export function Home() {
                   >
                     <GlassCard hover className="overflow-hidden group">
                       <div className="relative h-80 overflow-hidden">
-                        {!loadedImages.has(event.id) && (
+                        {event.coverImage && !loadedImages.has(event.id) && (
                           <div className="absolute inset-0 z-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer bg-[length:200%_100%]" />
                         )}
                         <ImageWithFallback
@@ -430,6 +431,13 @@ export function Home() {
                           alt={event.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           onLoad={() => setLoadedImages(prev => new Set(prev).add(event.id))}
+                          fallback={(
+                            <EventCoverPlaceholder
+                              title={event.title}
+                              subtitle={event.coupleNames}
+                              className="h-full w-full"
+                            />
+                          )}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-6">
                           <h3 className="text-white mb-2">{event.title}</h3>
