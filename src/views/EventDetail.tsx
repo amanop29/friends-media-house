@@ -923,19 +923,21 @@ export function EventDetail({ slug }: { slug?: string }) {
           >
             All Media
           </Button>
-          <Button
-            onClick={() => setMediaFilter('photos')}
-            variant={mediaFilter === 'photos' ? 'default' : 'outline'}
-            size="sm"
-            className={
-              mediaFilter === 'photos'
-                ? 'bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full'
-                : 'rounded-full border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white'
-            }
-          >
-            <Image className="w-4 h-4 mr-1" />
-            Photos Only
-          </Button>
+          {hasVideos && (
+            <Button
+              onClick={() => setMediaFilter('photos')}
+              variant={mediaFilter === 'photos' ? 'default' : 'outline'}
+              size="sm"
+              className={
+                mediaFilter === 'photos'
+                  ? 'bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full'
+                  : 'rounded-full border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white'
+              }
+            >
+              <Image className="w-4 h-4 mr-1" />
+              Photos Only
+            </Button>
+          )}
           {hasVideos && (
             <Button
               onClick={() => setMediaFilter('videos')}
@@ -988,6 +990,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                         src={photo.thumbnail || photo.url}
                         fallbackSrc={photo.url}
                         alt={`Photo ${photo.id}`}
+                        unoptimized
                         fill
                         priority={index < 6}
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -1122,6 +1125,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                               src={photo.thumbnail || photo.url}
                               fallbackSrc={photo.url}
                               alt={`Photo ${photo.id}`}
+                              unoptimized
                               fill
                               priority={index < 6}
                               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -1250,6 +1254,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                           src={photo.thumbnail || photo.url}
                           fallbackSrc={photo.url}
                           alt={`Photo ${photo.id}`}
+                          unoptimized
                           fill
                           priority={index < 4}
                           sizes="(max-width: 768px) 100vw, 192px"
