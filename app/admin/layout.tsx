@@ -12,17 +12,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   // Don't check auth for login page
   const isLoginPage = pathname === '/admin/login';
 
-  // Force dark mode for admin panel
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-    return () => {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'light') {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-  }, []);
-  
   // Redirect to login if not authenticated (only if not already on login page)
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isLoginPage) {
@@ -45,7 +34,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
   // Login page - no sidebar
   if (isLoginPage) {
-    return <>{children}</>;
+    return <div className="dark">{children}</div>;
   }
 
   // Not authenticated - show loading while redirecting
@@ -62,13 +51,15 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
   // Authenticated - show admin layout with sidebar
   return (
-    <div className="flex h-screen bg-gray-950">
-      <AdminSidebar />
-      <main
-        className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-6 pt-[calc(4rem+env(safe-area-inset-top))] lg:pt-6"
-      >
-        {children}
-      </main>
+    <div className="dark">
+      <div className="flex h-screen bg-gray-950">
+        <AdminSidebar />
+        <main
+          className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-6 pt-[calc(4rem+env(safe-area-inset-top))] lg:pt-6"
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

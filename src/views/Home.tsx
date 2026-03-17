@@ -390,7 +390,7 @@ export function Home() {
                   className={`${index >= 3 ? 'hidden md:block' : ''}`}
                 >
                   <GlassCard className="overflow-hidden">
-                    <div className="relative h-80">
+                    <div className="relative h-64">
                       <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer bg-[length:200%_100%]" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col items-center justify-end p-6">
                         <div className="w-3/4 h-6 bg-white/20 rounded mb-2 animate-pulse" />
@@ -417,7 +417,7 @@ export function Home() {
                     onTouchStart={() => router.prefetch(`/events/${event.slug || event.id}`)}
                   >
                     <GlassCard hover className="overflow-hidden group">
-                      <div className="relative h-80 overflow-hidden">
+                      <div className="relative h-64 overflow-hidden">
                         {event.coverImage && !loadedImages.has(event.id) && (
                           <div className="absolute inset-0 z-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer bg-[length:200%_100%]" />
                         )}

@@ -61,7 +61,7 @@ export function EventCoverPlaceholder({
           {displayTitle}
         </span>
         {!compact && subtitle ? (
-          <span className={cn('max-w-[28rem] text-sm text-[#4F5663] md:text-base dark:text-white/75', subtitleClassName)}>
+          <span className={cn('max-w-[28rem] text-sm font-medium text-[#2F3440] md:text-base dark:text-white/80', subtitleClassName)}>
             {subtitle}
           </span>
         ) : null}

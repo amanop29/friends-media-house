@@ -170,6 +170,13 @@ export function EventDetail({ slug }: { slug?: string }) {
     return getPhotoOrientation(photo) === orientation;
   });
 
+  const totalVideos = Math.max(
+    event?.videoCount || 0,
+    event?.videos?.length || 0,
+    event?.videoUrl ? 1 : 0,
+  );
+  const hasVideos = totalVideos > 0;
+
   // Set initial density based on screen size (client-side only)
   useEffect(() => {
     setDensity(window.innerWidth < 768 ? 2 : 4);
@@ -801,10 +808,12 @@ export function EventDetail({ slug }: { slug?: string }) {
                     <Image className="w-5 h-5" />
                     <span>{eventPhotos.length} Photo{eventPhotos.length !== 1 ? 's' : ''}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Video className="w-5 h-5" />
-                    <span>{event?.videoCount || event?.videos?.length || 0} Video{(event?.videoCount || event?.videos?.length || 0) !== 1 ? 's' : ''}</span>
-                  </div>
+                  {hasVideos && (
+                    <div className="flex items-center gap-2">
+                      <Video className="w-5 h-5" />
+                      <span>{totalVideos} Video{totalVideos !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -927,19 +936,21 @@ export function EventDetail({ slug }: { slug?: string }) {
             <Image className="w-4 h-4 mr-1" />
             Photos Only
           </Button>
-          <Button
-            onClick={() => setMediaFilter('videos')}
-            variant={mediaFilter === 'videos' ? 'default' : 'outline'}
-            size="sm"
-            className={
-              mediaFilter === 'videos'
-                ? 'bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full'
-                : 'rounded-full border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white'
-            }
-          >
-            <Video className="w-4 h-4 mr-1" />
-            Videos Only
-          </Button>
+          {hasVideos && (
+            <Button
+              onClick={() => setMediaFilter('videos')}
+              variant={mediaFilter === 'videos' ? 'default' : 'outline'}
+              size="sm"
+              className={
+                mediaFilter === 'videos'
+                  ? 'bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full'
+                  : 'rounded-full border-[#C5A572] text-[#C5A572] hover:bg-[#C5A572] hover:text-white'
+              }
+            >
+              <Video className="w-4 h-4 mr-1" />
+              Videos Only
+            </Button>
+          )}
         </motion.div>
 
         {/* Photo Grid - Grid View */}
