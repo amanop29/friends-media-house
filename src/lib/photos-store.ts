@@ -45,51 +45,52 @@ export async function addPhotos(newPhotos: Photo[]): Promise<void> {
 
   // Best-effort: sync to Supabase
   if (supabase && typeof supabase.from === 'function') {
-    for (const photo of newPhotos) {
-      // Only insert if we have the Supabase event ID
-      if (!photo.supabaseEventId) {
-        console.warn(`Photo ${photo.id} has no supabaseEventId; skipping Supabase sync. Event must be created in Supabase first.`);
-        continue;
-      }
+    const photosWithEventId = newPhotos.filter(p => p.supabaseEventId);
+    const photosWithoutEventId = newPhotos.filter(p => !p.supabaseEventId);
 
+    if (photosWithoutEventId.length > 0) {
+      console.warn(`${photosWithoutEventId.length} photo(s) have no supabaseEventId; skipping Supabase sync.`);
+    }
+
+    if (photosWithEventId.length > 0) {
       try {
-        // Don't pass the local ID - let Supabase generate UUID
+        // Batch insert all photos in a single request
+        const rows = photosWithEventId.map(photo => ({
+          event_id: photo.supabaseEventId,
+          url: photo.url,
+          thumbnail_url: photo.thumbnail,
+          alt_text: '',
+          display_order: 0,
+          width: photo.width || null,
+          height: photo.height || null,
+          orientation: photo.orientation || null,
+          file_size: photo.fileSize || null,
+          mime_type: photo.mimeType || null,
+        }));
+
         const { data, error } = await supabase
           .from('photos')
-          .insert({
-            event_id: photo.supabaseEventId, // Use Supabase event UUID
-            url: photo.url,
-            thumbnail_url: photo.thumbnail,
-            alt_text: '',
-            display_order: 0,
-            width: photo.width || null,
-            height: photo.height || null,
-            orientation: photo.orientation || null,
-            file_size: photo.fileSize || null,
-            mime_type: photo.mimeType || null,
-          })
-          .select()
-          .single();
-        
+          .insert(rows)
+          .select();
+
         if (error) {
-          console.error(`Failed to sync photo ${photo.id} to Supabase:`, error.message);
-        } else {
-          console.log(`Synced photo ${photo.id} to Supabase with UUID ${data?.id} for event ${photo.supabaseEventId}`);
-          // Store the Supabase UUID back in local storage
-          if (data?.id) {
-            photo.supabasePhotoId = data.id;
-            // Update the photo in localStorage with the new supabasePhotoId
-            const allPhotos = getPhotos();
-            const photoIndex = allPhotos.findIndex(p => p.id === photo.id);
-            if (photoIndex !== -1) {
-              allPhotos[photoIndex].supabasePhotoId = data.id;
-              savePhotos(allPhotos);
-              console.log(`Saved supabasePhotoId ${data.id} for photo ${photo.id}`);
+          console.error('Failed to batch-sync photos to Supabase:', error.message);
+        } else if (data) {
+          console.log(`Batch-synced ${data.length} photo(s) to Supabase.`);
+          // Write back Supabase UUIDs to localStorage
+          const allPhotos = getPhotos();
+          data.forEach((row: any, i: number) => {
+            const localPhoto = photosWithEventId[i];
+            if (localPhoto && row.id) {
+              localPhoto.supabasePhotoId = row.id;
+              const idx = allPhotos.findIndex(p => p.id === localPhoto.id);
+              if (idx !== -1) allPhotos[idx].supabasePhotoId = row.id;
             }
-          }
+          });
+          savePhotos(allPhotos);
         }
       } catch (err: any) {
-        console.error(`Failed to sync photo ${photo.id} to Supabase:`, err?.message || err);
+        console.error('Failed to batch-sync photos to Supabase:', err?.message || err);
       }
     }
   } else {

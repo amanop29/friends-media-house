@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Edit, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Upload, X, Video as VideoIcon, Image as ImageIcon, Filter } from 'lucide-react';
+import { Search, Edit, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Upload, X, Video as VideoIcon, Image as ImageIcon, Filter, Loader2 } from 'lucide-react';
 import { GlassCard } from '../../components/GlassCard';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -13,10 +13,10 @@ import { AdminTableSkeleton } from '../../components/SkeletonComponents';
 import { VideoManager } from '../../components/VideoManager';
 import { Event, Photo, Video } from '../../lib/mock-data';
 import { getEvents, saveEvents, deleteEvent as deleteEventFromStore, toggleEventVisibility, updateEvent } from '../../lib/events-store';
-import { getPhotos, addPhotos, deletePhoto as deletePhotoFromStore, getPhotosByEvent } from '../../lib/photos-store';
+import { getPhotos, addPhotos, deletePhoto as deletePhotoFromStore, getPhotosByEvent, updatePhoto } from '../../lib/photos-store';
 import { getCategories, getCategoryDisplayName } from '../../lib/categories-store';
 import { logActivity, getAdminEmail } from '../../lib/activity-log';
-import { uploadToR2 } from '../../lib/upload-helper';
+import { uploadEventPhotoOriginalToR2, type UploadResult } from '../../lib/upload-helper';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
@@ -28,6 +28,17 @@ interface UploadingPhoto {
   uploading: boolean;
   width?: number;
   height?: number;
+}
+
+function dedupePhotosById(photos: Photo[]): Photo[] {
+  const seen = new Set<string>();
+  return photos.filter((photo) => {
+    if (seen.has(photo.id)) {
+      return false;
+    }
+    seen.add(photo.id);
+    return true;
+  });
 }
 
 // Helper function to get image dimensions
@@ -60,6 +71,13 @@ export function ManageGalleries() {
   const [photosVersion, setPhotosVersion] = useState(0); // Force re-render when photos change
   const [eventPhotosCache, setEventPhotosCache] = useState<{ [eventId: string]: Photo[] }>({}); // Cache photos from Supabase
   const [eventVideosCache, setEventVideosCache] = useState<{ [eventId: string]: Video[] }>({}); // Cache videos from Supabase
+  const [coverUploadingSet, setCoverUploadingSet] = useState<Set<string>>(new Set());
+
+  // Configure R2 CORS once so browsers can PUT directly via presigned URLs (fast path).
+  // Best-effort: if it fails the server-POST fallback handles uploads anyway.
+  useEffect(() => {
+    fetch('/api/r2/cors', { method: 'POST' }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -373,7 +391,7 @@ export function ManageGalleries() {
       files.map(async (file, index) => {
         const dimensions = await getImageDimensions(file);
         return {
-          id: `${Date.now()}-${index}`,
+          id: `${crypto.randomUUID()}-${Date.now()}-${index}`,
           file,
           preview: URL.createObjectURL(file),
           progress: 0,
@@ -387,7 +405,10 @@ export function ManageGalleries() {
 
     setUploadingPhotos(prev => ({
       ...prev,
-      [eventId]: [...(prev[eventId] || []), ...newPhotos]
+      [eventId]: [
+        ...(prev[eventId] || []),
+        ...newPhotos.filter(photo => !(prev[eventId] || []).some(existing => existing.id === photo.id))
+      ]
     }));
 
     toast.success(`Uploading ${files.length} photo(s)...`);
@@ -446,8 +467,8 @@ export function ManageGalleries() {
       const uploadToast = toast.loading(`Uploading 0/${photos.length} photos...`);
 
       // Upload photos in parallel batches (through API - no CORS issues)
-      const BATCH_SIZE = 6;
-      const r2UploadResults = [];
+      const BATCH_SIZE = 8;
+      const r2UploadResults: Array<{ id: string; result: UploadResult }> = [];
       
       for (let i = 0; i < photos.length; i += BATCH_SIZE) {
         const batch = photos.slice(i, Math.min(i + BATCH_SIZE, photos.length));
@@ -455,7 +476,7 @@ export function ManageGalleries() {
         const batchResults = await Promise.allSettled(
           batch.map(async (photo) => {
             try {
-              const result = await uploadToR2(photo.file, 'events');
+              const result = await uploadEventPhotoOriginalToR2(photo.file);
               return { id: photo.id, result };
             } catch (err) {
               console.error(`Failed to upload ${photo.file.name}:`, err);
@@ -492,7 +513,7 @@ export function ManageGalleries() {
           return {
             id,
             url: result.url!,
-            thumbnail: result.url!,
+            thumbnail: result.thumbnailUrl || result.url!,
             eventId: eventId,
             supabaseEventId: event.supabaseId,
             tags: [],
@@ -506,7 +527,8 @@ export function ManageGalleries() {
         });
 
       if (newPhotos.length === 0) {
-        toast.error(`Failed to upload photos`);
+        const firstError = r2UploadResults.find(({ result }) => !result.success)?.result?.error;
+        toast.error(firstError ? `Upload failed: ${firstError}` : 'Failed to upload photos');
         return;
       }
 
@@ -525,11 +547,10 @@ export function ManageGalleries() {
 
       setEventPhotosCache(prev => ({
         ...prev,
-        [eventId]: [...(prev[eventId] || []), ...newPhotos]
+        [eventId]: dedupePhotosById([...(prev[eventId] || []), ...newPhotos])
       }));
 
       setPhotosVersion(v => v + 1);
-      setTimeout(() => fetchEventPhotos(eventId), 1000);
 
       const failedCount = r2UploadResults.length - newPhotos.length;
       const message = `${newPhotos.length} photo(s) uploaded successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`;
@@ -537,6 +558,41 @@ export function ManageGalleries() {
     } catch (error) {
       console.error('Error saving photos:', error);
       toast.error(`Failed to save photos: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleUploadCoverForEvent = async (event: Event, file: File) => {
+    setCoverUploadingSet(prev => new Set(prev).add(event.id));
+    const coverToast = toast.loading(`Uploading cover for "${event.title}"...`);
+    try {
+      const uploadResult = await uploadEventPhotoOriginalToR2(file);
+      if (!uploadResult.success || !uploadResult.url) {
+        toast.dismiss(coverToast);
+        toast.error(uploadResult.error || 'Cover upload failed');
+        return;
+      }
+      // Client-side thumbnail is already generated in parallel during upload — use it directly
+      const coverThumbnail = uploadResult.thumbnailUrl || uploadResult.url;
+      const updatedEvent: Event = {
+        ...event,
+        coverImage: uploadResult.url,
+        coverThumbnail,
+        coverUploadPending: false,
+      };
+      await updateEvent(updatedEvent);
+      setEvents(prev => prev.map(e => e.id === event.id ? updatedEvent : e));
+      toast.dismiss(coverToast);
+      toast.success('Cover image uploaded successfully!');
+    } catch (err) {
+      console.error('Cover upload error:', err);
+      toast.dismiss(coverToast);
+      toast.error('Failed to upload cover image');
+    } finally {
+      setCoverUploadingSet(prev => {
+        const next = new Set(prev);
+        next.delete(event.id);
+        return next;
+      });
     }
   };
 
@@ -594,6 +650,7 @@ export function ManageGalleries() {
               const isExpanded = expandedEvent === event.id;
               const uploadPhotos = uploadingPhotos[event.id] || [];
               const isVisible = event.isVisible ?? true;
+              const isCoverUploading = coverUploadingSet.has(event.id);
 
               return (
                 <motion.div
@@ -634,6 +691,17 @@ export function ManageGalleries() {
                             {isVisible && (
                               <span className="px-2 py-1 rounded-full bg-green-500/20 border border-green-500/50 text-xs text-green-500">
                                 Visible
+                              </span>
+                            )}
+                            {isCoverUploading && (
+                              <span className="px-2 py-1 rounded-full bg-amber-500/20 border border-amber-500/50 text-xs text-amber-500 flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Cover uploading...
+                              </span>
+                            )}
+                            {!event.coverImage && !isCoverUploading && (
+                              <span className="px-2 py-1 rounded-full bg-gray-500/20 border border-gray-500/50 text-xs text-gray-500">
+                                No cover
                               </span>
                             )}
                           </div>
@@ -716,6 +784,28 @@ export function ManageGalleries() {
                           >
                             <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                           </Button>
+                          {!event.coverImage && !isCoverUploading && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => document.getElementById(`coverInput-${event.id}`)?.click()}
+                              className="rounded-full hover:bg-amber-500/20 hover:text-amber-500 text-amber-500/70 w-9 h-9 md:w-10 md:h-10"
+                              title="Upload Cover Image"
+                            >
+                              <ImageIcon className="w-4 h-4 md:w-5 md:h-5" />
+                            </Button>
+                          )}
+                          <input
+                            id={`coverInput-${event.id}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUploadCoverForEvent(event, file);
+                              e.target.value = '';
+                            }}
+                          />
                         </div>
                       </div>
                     </div>

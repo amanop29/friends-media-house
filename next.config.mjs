@@ -60,6 +60,8 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Native modules that must not be bundled by Turbopack/webpack
+  serverExternalPackages: ['sharp'],
   // Configure experimental features
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'framer-motion'],

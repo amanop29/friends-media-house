@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadToR2, isR2Available, getPresignedUploadUrl } from '@/lib/r2-storage';
+import sharp from 'sharp';
+import { uploadToR2, uploadToR2ByKey, isR2Available, getPresignedUploadUrl, getPresignedUrlForKey } from '@/lib/r2-storage';
 
 /**
- * Simple upload endpoint for single files (cover images, banners, logos)
- * Also supports GET presign for large uploads (used by upload-helper for files >4MB)
+ * Image upload endpoint with immutable object naming.
+ * For gallery/events uploads, also generates CDN thumbnails at multiple sizes.
  */
+
+/** Width of the primary thumbnail used by the frontend (grid views, photo cards) */
+const THUMB_WIDTH = 640;
+
+function buildThumbKey(originalKey: string): string {
+  const base = originalKey.replace(/\.[^/.]+$/, '');
+  return `${base}__w${THUMB_WIDTH}.webp`;
+}
 
 // GET /api/upload - Returns a presigned URL for direct-to-R2 uploads (images)
 export async function GET(request: NextRequest) {
@@ -50,7 +59,25 @@ export async function GET(request: NextRequest) {
       folder as any
     );
 
-    return NextResponse.json({ success: true, uploadUrl, key, url: publicUrl });
+      // When the caller wants a paired thumbnail slot (client-side resize flow), presign
+      // the derived thumbnail key in the same response so only one server round-trip is needed.
+      const withThumb = searchParams.get('withThumb') === 'true';
+      if (withThumb) {
+        const thumbKey = buildThumbKey(key);
+        const { uploadUrl: thumbUploadUrl, publicUrl: thumbUrl } =
+          await getPresignedUrlForKey(thumbKey, 'image/webp');
+        return NextResponse.json({
+          success: true,
+          uploadUrl,
+          key,
+          url: publicUrl,
+          thumbUploadUrl,
+          thumbKey,
+          thumbUrl,
+        });
+      }
+
+      return NextResponse.json({ success: true, uploadUrl, key, url: publicUrl });
   } catch (error) {
     console.error('❌ Presign error (images):', error);
     return NextResponse.json(
@@ -97,7 +124,7 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to R2 (no processing for speed)
+    // Always upload original file for full-quality lightbox/downloads
     const uploadResult = await uploadToR2(
       buffer,
       file.name,
@@ -105,12 +132,41 @@ export async function POST(request: NextRequest) {
       folder as any
     );
 
-    console.log(`✅ Uploaded: ${uploadResult.url}`);
+    const shouldGenerateThumbs = ['events', 'gallery'].includes(folder);
+
+    if (!shouldGenerateThumbs) {
+      console.log(`✅ Uploaded: ${uploadResult.url}`);
+      return NextResponse.json({
+        success: true,
+        url: uploadResult.url,
+        key: uploadResult.key,
+      });
+    }
+
+    // Generate a single 640-wide WebP thumbnail — only this is used by the frontend.
+    // Runs best-effort: if encoding fails the upload still succeeds with original URL.
+    let thumbnailUrl = uploadResult.url;
+    try {
+      const thumbBuffer = await sharp(buffer)
+        .rotate()
+        .resize({ width: THUMB_WIDTH, withoutEnlargement: true, fit: 'inside' })
+        .webp({ quality: 78, effort: 4 })
+        .toBuffer();
+
+      const thumbKey = buildThumbKey(uploadResult.key);
+      const thumbUpload = await uploadToR2ByKey(thumbBuffer, thumbKey, 'image/webp');
+      thumbnailUrl = thumbUpload.url;
+    } catch (thumbErr) {
+      console.warn('⚠️ Thumbnail generation failed (non-fatal):', thumbErr);
+    }
+
+    console.log(`✅ Uploaded original + thumbnail: ${uploadResult.url}`);
 
     return NextResponse.json({
       success: true,
       url: uploadResult.url,
       key: uploadResult.key,
+      thumbnailUrl,
     });
 
   } catch (error) {

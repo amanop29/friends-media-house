@@ -11,12 +11,17 @@ interface OptimizedImageProps extends Omit<NextImageProps, 'src'> {
   fallbackSrc?: string;
 }
 
+const FALLBACK_IMG_SRC =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==';
+
 export function OptimizedImage({
   src,
   alt,
   blurDataURL,
-  fallbackSrc = '/placeholder-image.jpg',
+  fallbackSrc = FALLBACK_IMG_SRC,
   className,
+  onLoadingComplete,
+  onError,
   ...props
 }: OptimizedImageProps) {
   const [imgSrc, setImgSrc] = useState(src);
@@ -30,19 +35,23 @@ export function OptimizedImage({
         alt={alt}
         placeholder={blurDataURL ? 'blur' : 'empty'}
         blurDataURL={blurDataURL}
-        onLoadingComplete={() => setIsLoading(false)}
-        onError={() => {
+        onLoadingComplete={(result) => {
+          setIsLoading(false);
+          onLoadingComplete?.(result);
+        }}
+        onError={(event) => {
           setImgSrc(fallbackSrc);
           setIsLoading(false);
+          onError?.(event);
         }}
         className={cn(
           'transition-opacity duration-300',
           isLoading ? 'opacity-0' : 'opacity-100',
           className
         )}
-        loading="lazy"
-        quality={85}
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        loading={props.priority ? undefined : (props.loading || 'lazy')}
+        quality={props.quality || 82}
+        sizes={props.sizes || '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'}
       />
       {isLoading && (
         <div className="absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-800" />

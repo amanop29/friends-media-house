@@ -5,7 +5,7 @@ import { ImageOff, Calendar, MessageSquare, Star, Search, Inbox } from 'lucide-r
 import { Button } from './ui/button';
 
 interface EmptyStateProps {
-  icon?: React.ElementType;
+  icon?: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   action?: {

@@ -8,6 +8,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/button';
 import { EventCoverPlaceholder } from '../components/EventCoverPlaceholder';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { OptimizedImage } from '../components/OptimizedImage';
 import { PhotoComments } from '../components/PhotoComments';
 import { ViewModeToggle, ViewMode, Orientation } from '../components/ViewModeToggle';
 import { PhotoGridSkeleton } from '../components/SkeletonComponents';
@@ -674,9 +675,13 @@ export function EventDetail({ slug }: { slug?: string }) {
   const shareAlbum = async () => {
     if (!event) return;
 
+    const shareText = event.coupleNames?.trim()
+      ? `Check out ${event.coupleNames} - ${event.title}`
+      : `Check out ${event.title}`;
+
     const shareData = {
       title: event.title,
-      text: `Check out ${event.coupleNames} - ${event.title}`,
+      text: shareText,
       url: window.location.href,
     };
 
@@ -769,20 +774,29 @@ export function EventDetail({ slug }: { slug?: string }) {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                {event?.coverImage && isCoverImageLoaded && !didCoverImageFail ? (
-                  <h1 className="text-white text-4xl md:text-5xl mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
-                    {event?.title}
-                  </h1>
+                {event?.coverImage && !didCoverImageFail ? (
+                  <>
+                    <h1 className="text-white text-4xl md:text-5xl mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
+                      {event?.title}
+                    </h1>
+                    {event?.coupleNames?.trim() ? (
+                      <p className="text-white/85 text-xl mb-4">{event.coupleNames}</p>
+                    ) : null}
+                  </>
                 ) : null}
                 <div className="flex flex-wrap gap-6 text-white/90">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    <span>{new Date(event?.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    <span>{event?.location}</span>
-                  </div>
+                  {event?.date && !Number.isNaN(new Date(event.date).getTime()) ? (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      <span>{new Date(event.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                  ) : null}
+                  {event?.location?.trim() ? (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5" />
+                      <span>{event.location}</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center gap-2">
                     <Image className="w-5 h-5" />
                     <span>{eventPhotos.length} Photo{eventPhotos.length !== 1 ? 's' : ''}</span>
@@ -959,11 +973,14 @@ export function EventDetail({ slug }: { slug?: string }) {
                       {!imageLoadingStates.get(photo.id) && (
                         <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 bg-[length:200%_100%]" style={{ animation: 'shimmer 1.5s infinite' }} />
                       )}
-                      <ImageWithFallback
-                        src={photo.url}
+                      <OptimizedImage
+                        src={photo.thumbnail || photo.url}
                         alt={`Photo ${photo.id}`}
+                        fill
+                        priority={index < 6}
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        onLoad={() => {
+                        onLoadingComplete={() => {
                           setImageLoadingStates(prev => {
                             const newStates = new Map(prev);
                             newStates.set(photo.id, true);
@@ -1089,11 +1106,14 @@ export function EventDetail({ slug }: { slug?: string }) {
                               />
                             )}
                             {/* Actual Image */}
-                            <ImageWithFallback
-                              src={photo.url}
+                            <OptimizedImage
+                              src={photo.thumbnail || photo.url}
                               alt={`Photo ${photo.id}`}
+                              fill
+                              priority={index < 6}
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                               className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105 rounded-lg"
-                              onLoad={() => {
+                              onLoadingComplete={() => {
                                 setImageLoadingStates(prev => {
                                   const newStates = new Map(prev);
                                   newStates.set(photo.id, true);
@@ -1204,7 +1224,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                         </div>
                       )}
                       <div
-                        className="w-full md:w-48 h-48 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer group"
+                        className="relative w-full md:w-48 h-48 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer group"
                         onClick={() => {
                           if (selectionMode) {
                             togglePhotoSelection(photo.id);
@@ -1213,9 +1233,12 @@ export function EventDetail({ slug }: { slug?: string }) {
                           }
                         }}
                       >
-                        <ImageWithFallback
-                          src={photo.url}
+                        <OptimizedImage
+                          src={photo.thumbnail || photo.url}
                           alt={`Photo ${photo.id}`}
+                          fill
+                          priority={index < 4}
+                          sizes="(max-width: 768px) 100vw, 192px"
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                       </div>

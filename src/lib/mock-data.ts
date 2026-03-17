@@ -78,6 +78,7 @@ export interface Event {
   videos?: Video[]; // New field for multiple videos
   isVisible?: boolean; // Controls if gallery is visible on website
   isFeatured?: boolean; // Controls if event is featured on homepage
+  coverUploadPending?: boolean; // true while a background cover upload is in progress / was interrupted
   slug?: string; // URL-friendly slug for the event
 }
 

@@ -10,9 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { Checkbox } from '../../components/ui/checkbox';
 import { getCategories, fetchCategories, addCategory, deleteCategory, getCategoryDisplayName, isDefaultCategory } from '../../lib/categories-store';
-import { addEvent, generateSlug } from '../../lib/events-store';
+import { addEvent, generateSlug, updateEvent } from '../../lib/events-store';
 import type { Event } from '../../lib/mock-data';
-import { uploadToR2 } from '../../lib/upload-helper';
+import { generatePhotoThumbnail, uploadEventPhotoOriginalToR2 } from '../../lib/upload-helper';
 import { supabase } from '../../lib/supabase';
 import { logActivity, getAdminEmail } from '../../lib/activity-log';
 import { toast } from 'sonner';
@@ -78,34 +78,12 @@ export function AddEvent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate cover image
-    if (!formData.coverImage) {
-      toast.error('Please upload a cover image');
-      return;
-    }
-
     setIsUploading(true);
-    setLoadingMessage('Uploading cover image...');
-    const uploadToast = toast.loading('Uploading cover image...');
+    setLoadingMessage('Creating event...');
     let createToast: string | number | undefined;
     
     try {
-      // Upload cover image to R2
-      const uploadResult = await uploadToR2(formData.coverImage, 'events');
-      
-      if (!uploadResult.success || !uploadResult.url) {
-        toast.dismiss(uploadToast);
-        toast.error(uploadResult.error || 'Failed to upload cover image');
-        setIsUploading(false);
-        setLoadingMessage('');
-        return;
-      }
-      
-      toast.dismiss(uploadToast);
-      setLoadingMessage('Creating event...');
-      createToast = toast.loading('Creating event in database...');
-      
-      // Create new event object with R2 URL (not base64)
+      const selectedCoverImage = formData.coverImage;
       const baseSlug = generateSlug(formData.title);
       let uniqueSlug = baseSlug;
       const newEvent: Event = {
@@ -115,14 +93,17 @@ export function AddEvent() {
         date: formData.date,
         location: formData.location,
         category: formData.category,
-        coverImage: uploadResult.url, // Use R2 URL instead of base64
-        coverThumbnail: uploadResult.thumbnailUrl, // Store thumbnail URL
+        coverImage: '',
+        coverThumbnail: '',
+        coverUploadPending: !!selectedCoverImage,
         photoCount: 0,
         isVisible: true,
         isFeatured: formData.isFeatured,
         slug: uniqueSlug,
         supabaseId: undefined,
       };
+
+      createToast = toast.loading('Creating event in database...');
 
       // Sync category in background (don't block event creation)
       if (supabase && formData.category) {
@@ -229,29 +210,27 @@ export function AddEvent() {
       // Save to events store
       addEvent(newEvent);
 
-      // Log activity AFTER event is saved (best effort)
-      try {
-        await logActivity({
-          entityType: 'event',
-          entityId: newEvent.supabaseId || newEvent.id,
-          action: 'create',
-          description: `Created event "${newEvent.title}" in category "${getCategoryDisplayName(newEvent.category)}"`,
-          adminEmail: getAdminEmail() || undefined,
-        });
-      } catch (logErr) {
+      // Log activity in the background so event creation isn't blocked on analytics.
+      void logActivity({
+        entityType: 'event',
+        entityId: newEvent.supabaseId || newEvent.id,
+        action: 'create',
+        description: `Created event "${newEvent.title}" in category "${getCategoryDisplayName(newEvent.category)}"`,
+        adminEmail: getAdminEmail() || undefined,
+      }).catch((logErr) => {
         console.warn('Failed to log activity:', logErr);
-      }
+      });
 
       toast.dismiss(createToast);
-      toast.success('Event created successfully!');
+      toast.success(
+        selectedCoverImage
+          ? 'Event created. Cover image is uploading in the background...'
+          : 'Event created successfully!'
+      );
       setLoadingMessage('');
-      
-      // Clean up preview URL
-      if (previewImage) {
-        URL.revokeObjectURL(previewImage);
-      }
-      
-      // Reset form
+
+      const previewToRevoke = previewImage;
+
       setFormData({
         title: '',
         coupleNames: '',
@@ -262,11 +241,52 @@ export function AddEvent() {
         isFeatured: false,
       });
       setPreviewImage(null);
+      setIsUploading(false);
+
+      if (previewToRevoke) {
+        URL.revokeObjectURL(previewToRevoke);
+      }
+
+      if (selectedCoverImage) {
+        void (async () => {
+          const coverToast = toast.loading('Uploading cover image...');
+          try {
+            const uploadResult = await uploadEventPhotoOriginalToR2(selectedCoverImage);
+            if (!uploadResult.success || !uploadResult.url) {
+              toast.dismiss(coverToast);
+              toast.error(uploadResult.error || 'Cover upload failed. Event was created without a cover image.');
+              return;
+            }
+
+            let coverThumbnail = uploadResult.url;
+            if (uploadResult.key) {
+              const thumbResult = await generatePhotoThumbnail(uploadResult.key);
+              if (thumbResult.success && thumbResult.thumbnailUrl) {
+                coverThumbnail = thumbResult.thumbnailUrl;
+              }
+            }
+
+            const updatedEvent: Event = {
+              ...newEvent,
+              coverImage: uploadResult.url,
+              coverThumbnail,
+              coverUploadPending: false,
+            };
+
+            await updateEvent(updatedEvent);
+            toast.dismiss(coverToast);
+            toast.success('Cover image uploaded successfully!');
+          } catch (coverError) {
+            console.error('Cover upload error:', coverError);
+            toast.dismiss(coverToast);
+            toast.error('Event created, but cover image upload failed. You can re-upload it from Manage Galleries.');
+          }
+        })();
+      }
     } catch (error) {
       console.error('Error creating event:', error);
       if (createToast) toast.dismiss(createToast);
       toast.error('Failed to create event');
-    } finally {
       setIsUploading(false);
       setLoadingMessage('');
     }
@@ -349,12 +369,11 @@ export function AddEvent() {
 
               <div>
                 <label htmlFor="coupleNames" className="block text-[#2B2B2B] dark:text-white mb-2">
-                  Couple Names *
+                  Couple Names (optional)
                 </label>
                 <Input
                   id="coupleNames"
                   type="text"
-                  required
                   value={formData.coupleNames}
                   onChange={(e) => setFormData({ ...formData, coupleNames: e.target.value })}
                   className="rounded-lg bg-white/50 dark:bg-black/20 border-black/20 dark:border-white/10 focus:border-[#C5A572]"
@@ -366,12 +385,11 @@ export function AddEvent() {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="date" className="block text-[#2B2B2B] dark:text-white mb-2">
-                  Event Date *
+                  Event Date (optional)
                 </label>
                 <Input
                   id="date"
                   type="date"
-                  required
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   className="rounded-lg bg-white/50 dark:bg-black/20 border-black/20 dark:border-white/10 focus:border-[#C5A572]"
@@ -454,12 +472,11 @@ export function AddEvent() {
 
             <div>
               <label htmlFor="location" className="block text-[#2B2B2B] dark:text-white mb-2">
-                Location *
+                Location (optional)
               </label>
               <Input
                 id="location"
                 type="text"
-                required
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="rounded-lg bg-white/50 dark:bg-black/20 border-black/20 dark:border-white/10 focus:border-[#C5A572]"
@@ -485,7 +502,7 @@ export function AddEvent() {
 
             <div>
               <label htmlFor="coverImage" className="block text-[#2B2B2B] dark:text-white mb-2">
-                Cover Image *
+                Cover Image (optional)
               </label>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">

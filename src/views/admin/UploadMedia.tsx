@@ -9,10 +9,10 @@ import { Progress } from '../../components/ui/progress';
 import { VideoManager } from '../../components/VideoManager';
 import { toast } from 'sonner';
 import { getEvents, updateEvent } from '../../lib/events-store';
-import { addPhotos } from '../../lib/photos-store';
+import { addPhotos, updatePhoto } from '../../lib/photos-store';
 import { Video } from '../../lib/mock-data';
 import { ImageWithFallback } from '../../components/figma/ImageWithFallback';
-import { uploadToR2 } from '../../lib/upload-helper';
+import { generatePhotoThumbnail, uploadEventPhotoOriginalToR2 } from '../../lib/upload-helper';
 import { supabase } from '../../lib/supabase';
 
 interface UploadedPhoto {
@@ -29,6 +29,11 @@ export function UploadMedia() {
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [eventVideos, setEventVideos] = useState<Video[]>([]);
+
+  // Configure R2 CORS once so browsers can PUT directly via presigned URLs (fast path).
+  useEffect(() => {
+    fetch('/api/r2/cors', { method: 'POST' }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Load events on mount
@@ -199,7 +204,7 @@ export function UploadMedia() {
       const r2UploadResults = await Promise.all(
         uploadedPhotos.map(async (photo) => {
           try {
-            const result = await uploadToR2(photo.file, 'events');
+            const result = await uploadEventPhotoOriginalToR2(photo.file);
             return { id: photo.id, result };
           } catch (err) {
             console.error(`Failed to upload ${photo.file.name} to R2:`, err);
@@ -233,6 +238,24 @@ export function UploadMedia() {
 
       // Add photos to the photos store (also syncs to Supabase, best-effort)
       await addPhotos(newPhotos);
+
+      const uploadKeyById = new Map(
+        r2UploadResults
+          .filter(({ result }) => result.success && result.url && result.key)
+          .map(({ id, result }) => [id, result.key as string])
+      );
+
+      void Promise.allSettled(
+        newPhotos.map(async (photo) => {
+          const key = uploadKeyById.get(photo.id);
+          if (!key) return;
+
+          const thumbResult = await generatePhotoThumbnail(key, (photo as { supabasePhotoId?: string }).supabasePhotoId);
+          if (!thumbResult.success || !thumbResult.thumbnailUrl) return;
+
+          updatePhoto({ ...photo, thumbnail: thumbResult.thumbnailUrl });
+        })
+      );
 
       toast.success(`${newPhotos.length} photo(s) uploaded successfully!`);
       setUploadedPhotos([]);

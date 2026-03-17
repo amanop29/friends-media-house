@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,12 +8,10 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/ui/button';
 import { EventCoverPlaceholder } from '../components/EventCoverPlaceholder';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { FAQSection } from '../components/FAQSection';
 import { getEvents } from '../lib/events-store';
 import { getSettings, fetchSettings, getHomeBannerUrls, type SiteSettings } from '../lib/settings';
 import { supabase } from '../lib/supabase';
-
-// Lazy load FAQSection for better performance
-const FAQSection = lazy(() => import('../components/FAQSection').then(mod => ({ default: mod.FAQSection })));
 
 interface FeaturedEvent {
   id: string;
@@ -344,7 +342,7 @@ export function Home() {
         </div>
 
         {/* Hero Content */}
-        <div className="relative z-10 text-center px-6 max-w-4xl">
+        <div className="absolute bottom-20 md:bottom-24 left-1/2 z-10 w-full max-w-4xl -translate-x-1/2 px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -353,9 +351,6 @@ export function Home() {
             <h1 className="text-5xl md:text-7xl text-white mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
               {settings.tagline}
             </h1>
-            <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-              Crafting Visual Memories
-            </p>
             <div className="flex gap-4 justify-center flex-wrap">
               <Link href="/gallery">
                 <Button className="bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full px-8 py-6">
@@ -439,10 +434,12 @@ export function Home() {
                             />
                           )}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-6">
-                          <h3 className="text-white mb-2">{event.title}</h3>
-                          <p className="text-white/80 text-sm">{event.coupleNames}</p>
-                        </div>
+                        {loadedImages.has(event.id) && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-6">
+                            <h3 className="text-white mb-2">{event.title}</h3>
+                            <p className="text-white/80 text-sm">{event.coupleNames}</p>
+                          </div>
+                        )}
                       </div>
                     </GlassCard>
                   </Link>
@@ -487,10 +484,8 @@ export function Home() {
         </div>
       </section>
 
-      {/* FAQ Section - Lazy loaded for better performance */}
-      <Suspense fallback={<div className="h-96 bg-gray-200 dark:bg-gray-800 animate-pulse" />}>
-        <FAQSection limit={6} />
-      </Suspense>
+      {/* FAQ Section */}
+      <FAQSection limit={6} />
 
       {/* CTA Section */}
       <section className="md:py-6 lg:px-8 bg-[#FAFAFA] dark:bg-[#0F0F0F] px-[32px] py-[0px]">

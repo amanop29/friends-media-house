@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Save, Upload, Plus, Loader2 } from 'lucide-react';
+import { X, Save, Upload, Plus, Loader2, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -24,6 +24,7 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
   const [formData, setFormData] = useState<Event | null>(null);
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [coverImagePreview, setCoverImagePreview] = useState<string>('');
+  const coverImageInputRef = useRef<HTMLInputElement>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
@@ -47,18 +48,6 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
     // Validation
     if (!formData.title.trim()) {
       toast.error('Please enter an event title');
-      return;
-    }
-    if (!formData.coupleNames.trim()) {
-      toast.error('Please enter couple names');
-      return;
-    }
-    if (!formData.location.trim()) {
-      toast.error('Please enter a location');
-      return;
-    }
-    if (!formData.date) {
-      toast.error('Please select a date');
       return;
     }
 
@@ -116,6 +105,25 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
     if (file) {
       setCoverImageFile(file);
       setCoverImagePreview(URL.createObjectURL(file));
+    }
+
+    // Reset so selecting the same file again still triggers onChange.
+    e.target.value = '';
+  };
+
+  const handleRemoveCoverImage = () => {
+    if (!formData) return;
+
+    setCoverImageFile(null);
+    setCoverImagePreview('');
+    setFormData({
+      ...formData,
+      coverImage: '',
+      coverThumbnail: undefined,
+    });
+
+    if (coverImageInputRef.current) {
+      coverImageInputRef.current.value = '';
     }
   };
 
@@ -199,7 +207,7 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                   {/* Couple Names */}
                   <div className="space-y-2">
                     <Label htmlFor="coupleNames" className="text-[#2B2B2B] dark:text-white">
-                      Couple Names
+                      Couple Names (optional)
                     </Label>
                     <Input
                       id="coupleNames"
@@ -207,7 +215,6 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                       onChange={(e) => handleChange('coupleNames', e.target.value)}
                       placeholder="e.g., Priya Sharma & Rahul Verma"
                       className="rounded-lg bg-white/50 dark:bg-black/20 border-white/20 dark:border-white/10 focus:border-[#C5A572]"
-                      required
                     />
                   </div>
 
@@ -215,7 +222,7 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="date" className="text-[#2B2B2B] dark:text-white">
-                        Event Date
+                        Event Date (optional)
                       </Label>
                       <Input
                         id="date"
@@ -223,7 +230,6 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                         value={formData.date}
                         onChange={(e) => handleChange('date', e.target.value)}
                         className="rounded-lg bg-white/50 dark:bg-black/20 border-white/20 dark:border-white/10 focus:border-[#C5A572]"
-                        required
                       />
                     </div>
 
@@ -275,7 +281,7 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                   {/* Location */}
                   <div className="space-y-2">
                     <Label htmlFor="location" className="text-[#2B2B2B] dark:text-white">
-                      Location
+                      Location (optional)
                     </Label>
                     <Input
                       id="location"
@@ -283,7 +289,6 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                       onChange={(e) => handleChange('location', e.target.value)}
                       placeholder="e.g., The Grand Palace, Mumbai"
                       className="rounded-lg bg-white/50 dark:bg-black/20 border-white/20 dark:border-white/10 focus:border-[#C5A572]"
-                      required
                     />
                   </div>
 
@@ -310,13 +315,25 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
                         <Button
                           type="button"
                           className="bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full px-6"
-                          onClick={() => document.getElementById('coverImageFile')?.click()}
+                          onClick={() => coverImageInputRef.current?.click()}
                         >
                           Browse Files
                         </Button>
                       </label>
+                      {coverImagePreview && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-3 border-red-500/40 text-red-500 hover:bg-red-500/10 rounded-full px-6"
+                          onClick={handleRemoveCoverImage}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Cover Image
+                        </Button>
+                      )}
                       <input
                         id="coverImageFile"
+                        ref={coverImageInputRef}
                         type="file"
                         accept="image/*"
                         onChange={handleCoverImageChange}

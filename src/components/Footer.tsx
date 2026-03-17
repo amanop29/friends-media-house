@@ -25,7 +25,7 @@ function ContactFlipCard({
   actionLabel,
   onAction,
 }: {
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   frontText: string;
   backText: string;
   actionLabel: string;

@@ -32,10 +32,11 @@ export async function generateMetadata({ params }: Props) {
     coverImage = `${baseUrl}${coverImage.startsWith('/') ? '' : '/'}${coverImage}`;
   }
   
+  // Fall back to the OG default image rather than crashing when no cover is set
   if (!coverImage) {
-    throw new Error(`No cover image found for event: ${event.title}`);
+    coverImage = `${baseUrl}/og-image.jpg`;
   }
-  
+
   return {
     title: eventTitle,
     description: eventDescription,

@@ -17,7 +17,7 @@ export function ImageWithFallback(props: ImageWithFallbackProps) {
     props.onError?.(event)
   }
 
-  const { src, alt, style, className, onLoad, eager, loading, fallback, ...rest } = props
+  const { src, alt, style, className, onLoad, eager, loading, fallback, fetchPriority, ...rest } = props
 
   // Determine loading strategy - default to lazy unless eager is specified
   const loadingStrategy = eager ? 'eager' : (loading || 'lazy');
@@ -60,6 +60,7 @@ export function ImageWithFallback(props: ImageWithFallbackProps) {
       className={className} 
       style={style} 
       loading={loadingStrategy}
+      fetchPriority={fetchPriority || (eager ? 'high' : 'low')}
       decoding="async"
       {...rest} 
       onError={handleError} 
