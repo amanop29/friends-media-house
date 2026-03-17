@@ -68,6 +68,11 @@ export function AddEvent() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('Cover image must be under 50 MB. Please resize the photo and try again.');
+        e.target.value = '';
+        return;
+      }
       setFormData({ ...formData, coverImage: file });
       // Create object URL for preview (doesn't bloat memory like base64)
       const objectUrl = URL.createObjectURL(file);

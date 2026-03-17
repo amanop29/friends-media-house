@@ -802,7 +802,14 @@ export function ManageGalleries() {
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) handleUploadCoverForEvent(event, file);
+                              if (file) {
+                                if (file.size > 50 * 1024 * 1024) {
+                                  toast.error('Cover image must be under 50 MB. Please resize the photo and try again.');
+                                  e.target.value = '';
+                                  return;
+                                }
+                                handleUploadCoverForEvent(event, file);
+                              }
                               e.target.value = '';
                             }}
                           />

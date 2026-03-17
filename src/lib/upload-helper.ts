@@ -246,6 +246,13 @@ export async function uploadEventPhotoOriginalToR2(file: File): Promise<UploadRe
     // If presigned PUT was blocked (CORS not yet configured on the R2 bucket) fall back to the
     // server-POST path which proxies through Next.js and avoids CORS entirely.
     console.warn('[upload] Presigned PUT failed, retrying via server POST:', presignResult.error);
+    // Vercel serverless functions cap request bodies at ~4.5 MB (FUNCTION_PAYLOAD_TOO_LARGE).
+    // Compress the image first so the server POST always stays under that limit.
+    const VERCEL_SAFE_SIZE = 3 * 1024 * 1024; // 3 MB — comfortable margin below the 4.5 MB cap
+    if (normalizedFile.size > VERCEL_SAFE_SIZE) {
+      console.log(`[upload] File (${(normalizedFile.size / 1024 / 1024).toFixed(1)} MB) too large for server POST — compressing before fallback`);
+      return await compressAndUploadImage(normalizedFile, 'events', 3);
+    }
     return await uploadToR2(normalizedFile, 'events');
   } catch (error) {
     console.error('Event photo upload error:', error);
