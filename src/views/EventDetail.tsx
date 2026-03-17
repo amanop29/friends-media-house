@@ -986,6 +986,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                       )}
                       <OptimizedImage
                         src={photo.thumbnail || photo.url}
+                        fallbackSrc={photo.url}
                         alt={`Photo ${photo.id}`}
                         fill
                         priority={index < 6}
@@ -1119,6 +1120,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                             {/* Actual Image */}
                             <OptimizedImage
                               src={photo.thumbnail || photo.url}
+                              fallbackSrc={photo.url}
                               alt={`Photo ${photo.id}`}
                               fill
                               priority={index < 6}
@@ -1246,6 +1248,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                       >
                         <OptimizedImage
                           src={photo.thumbnail || photo.url}
+                          fallbackSrc={photo.url}
                           alt={`Photo ${photo.id}`}
                           fill
                           priority={index < 4}
