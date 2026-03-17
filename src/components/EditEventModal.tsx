@@ -10,7 +10,7 @@ import { Checkbox } from './ui/checkbox';
 import { GlassCard } from './GlassCard';
 import { Event } from '../lib/mock-data';
 import { getCategories, addCategory, getCategoryDisplayName } from '../lib/categories-store';
-import { uploadToR2 } from '../lib/upload-helper';
+import { uploadEventPhotoOriginalToR2, generatePhotoThumbnail } from '../lib/upload-helper';
 import { toast } from 'sonner';
 
 interface EditEventModalProps {
@@ -59,15 +59,22 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
       
       // If a new cover image file is selected, upload it to R2
       if (coverImageFile) {
-        toast.loading('Uploading cover image...');
-        const uploadResult = await uploadToR2(coverImageFile, 'events');
+        const coverToast = toast.loading('Uploading cover image...');
+        const uploadResult = await uploadEventPhotoOriginalToR2(coverImageFile);
         if (uploadResult.success && uploadResult.url) {
           finalCoverImage = uploadResult.url;
-          finalCoverThumbnail = uploadResult.thumbnailUrl; // Store thumbnail URL
-          toast.dismiss();
+          finalCoverThumbnail = uploadResult.thumbnailUrl || uploadResult.url;
+          // Try to generate a server-side thumbnail if we have the key
+          if (uploadResult.key) {
+            const thumbResult = await generatePhotoThumbnail(uploadResult.key);
+            if (thumbResult.success && thumbResult.thumbnailUrl) {
+              finalCoverThumbnail = thumbResult.thumbnailUrl;
+            }
+          }
+          toast.dismiss(coverToast);
           toast.success('Cover image uploaded!');
         } else {
-          toast.dismiss();
+          toast.dismiss(coverToast);
           toast.error(uploadResult.error || 'Failed to upload cover image');
           setIsUploading(false);
           return;
@@ -103,6 +110,11 @@ export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModa
   const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('Cover image must be under 50 MB. Please resize the photo and try again.');
+        e.target.value = '';
+        return;
+      }
       setCoverImageFile(file);
       setCoverImagePreview(URL.createObjectURL(file));
     }
