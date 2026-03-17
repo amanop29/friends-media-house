@@ -367,7 +367,20 @@ export function Footer() {
           </div>
 
           <div className="mt-12 pt-8 border-t border-[#2B2B2B]/20 dark:border-white/10 text-center text-[#707070] dark:text-[#A0A0A0]">
-            <p>&copy; 2026 {settings.siteName}. All rights reserved.</p>
+            <p>&copy; 2026 {settings.siteName}.</p>
+            <p className="mt-3 text-sm text-black dark:text-white">
+              Made by{" "}
+              <a
+                href="https://www.streetfreak.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#C5A572] hover:text-[#C5A572]-200 hover:underline transition-colors"
+              >
+                streetfreak
+              </a>
+              {" "}with{" "}
+              <span className="text-red-500">♥</span>
+            </p>
           </div>
         </GlassCard>
       </div>
