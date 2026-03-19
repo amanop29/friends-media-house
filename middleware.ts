@@ -79,6 +79,20 @@ async function isLaunchPageEnabled(): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const now = Date.now();
+
+  // After the launch cutoff, /launch is no longer accessible and routes to home.
+  if (pathname.startsWith('/launch') && now >= LAUNCH_AUTO_DISABLE_AT_UTC) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // Allow /launch only when explicitly enabled from admin settings.
+  if (pathname.startsWith('/launch')) {
+    const enabled = await isLaunchPageEnabled();
+    if (!enabled) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
 
   // Skip middleware for API routes
   if (pathname.startsWith('/api/')) {
