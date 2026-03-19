@@ -62,8 +62,8 @@ export default function LaunchPage() {
     }
   };
 
-  // Launch date: 19 March 2026 at 12:00 PM IST (UTC+5:30)
-  const launchDate = new Date('2026-03-19T06:30:00Z');
+  // Launch date: 19 March 2026 at 9:00 PM IST (UTC+5:30)
+  const launchDate = new Date('2026-03-19T15:30:00Z');
 
   useEffect(() => {
     setMounted(true);
@@ -141,6 +141,7 @@ export default function LaunchPage() {
   };
 
   const pad = (n: number) => n.toString().padStart(2, '0');
+  const hasLaunchTimePassed = mounted && Date.now() >= launchDate.getTime();
 
   return (
     <div className="relative min-h-screen min-h-[100svh] w-full overflow-x-hidden overflow-y-auto bg-[#060608]">
@@ -246,10 +247,21 @@ export default function LaunchPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.7, delay: 0.25 }}
                 >
-                  <BlurText text="Launching" delay={0.1} />{' '}
-                  <span className="font-semibold italic text-transparent bg-clip-text bg-gradient-to-r from-[#C5A572] via-[#E8D5B5] to-[#C5A572]">
-                    Soon..
-                  </span>
+                  {hasLaunchTimePassed ? (
+                    <>
+                      <BlurText text="Maintainance" delay={0.1} />{' '}
+                      <span className="font-semibold italic text-transparent bg-clip-text bg-gradient-to-r from-[#C5A572] via-[#E8D5B5] to-[#C5A572]">
+                        Break
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <BlurText text="Launching" delay={0.1} />{' '}
+                      <span className="font-semibold italic text-transparent bg-clip-text bg-gradient-to-r from-[#C5A572] via-[#E8D5B5] to-[#C5A572]">
+                        Soon..
+                      </span>
+                    </>
+                  )}
                   {/* <Sparkles className="inline-block ml-2 w-5 h-5 sm:w-6 sm:h-6 text-[#C5A572]/50 align-middle animate-pulse" style={{ animationDuration: '2.5s' }} /> */}
                 </motion.h1>
 
@@ -301,7 +313,7 @@ export default function LaunchPage() {
                     transition={{ duration: 0.8, delay: 0.55 }}
                   >
                     <span className="text-[#C5A572]/40">✦</span>{' '}
-                    19 March 2026{' '}
+                    19 March 2026 • 9:00 PM IST{' '}
                     <span className="text-[#C5A572]/40">✦</span>
                   </motion.p>
 

@@ -5,6 +5,23 @@ import type { NextRequest } from 'next/server';
 let cachedLaunchEnabled: boolean | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 30_000; // 30 seconds
+const LAUNCH_AUTO_DISABLE_AT_UTC = Date.parse('2026-03-19T15:30:00Z'); // 9:00 PM IST
+
+async function disableLaunchPage(supabaseUrl: string, supabaseKey: string, value: Record<string, unknown>) {
+  await fetch(`${supabaseUrl}/rest/v1/settings?key=eq.site_config`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({
+      value,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+}
 
 async function isLaunchPageEnabled(): Promise<boolean> {
   const now = Date.now();
@@ -30,7 +47,28 @@ async function isLaunchPageEnabled(): Promise<boolean> {
       }
     );
     const data = await res.json();
-    const enabled = data?.[0]?.value?.launchPageEnabled === true;
+    const currentSettings = data?.[0]?.value || {};
+    const enabled = currentSettings.launchPageEnabled === true;
+
+    // Auto-disable once when countdown reaches the scheduled launch cutoff.
+    if (enabled && now >= LAUNCH_AUTO_DISABLE_AT_UTC && currentSettings.launchCutoffHandled !== true) {
+      const updatedSettings = {
+        ...currentSettings,
+        launchPageEnabled: false,
+        launchCutoffHandled: true,
+      };
+
+      try {
+        await disableLaunchPage(supabaseUrl, supabaseKey, updatedSettings);
+      } catch {
+        // Fallback to allowing traffic through even if persistence fails.
+      }
+
+      cachedLaunchEnabled = false;
+      cacheTimestamp = now;
+      return false;
+    }
+
     cachedLaunchEnabled = enabled;
     cacheTimestamp = now;
     return enabled;

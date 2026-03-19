@@ -16,6 +16,7 @@ export interface SiteSettings {
   secondLogoUrl?: string;
   launchPageEnabled?: boolean;
   launchPagePassword?: string;
+  launchCutoffHandled?: boolean;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   youtube: '@friendsmediahouse',
   launchPageEnabled: false,
   launchPagePassword: '',
+  launchCutoffHandled: false,
 };
 
 const SETTINGS_KEY = 'siteSettings';
