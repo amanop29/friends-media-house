@@ -36,10 +36,10 @@ export function AboutUs() {
   ];
 
   const stats = [
-    { number: '500+', label: 'Events Covered', icon: Camera },
-    { number: '10K+', label: 'Happy Clients', icon: Heart },
-    { number: '50K+', label: 'Photos Delivered', icon: Film },
-    { number: '8+', label: 'Years Experience', icon: Award },
+    { number: '350+', label: 'Events Covered', icon: Camera },
+    { number: '150+', label: 'Happy Clients', icon: Heart },
+    { number: '10L+', label: 'Photos Delivered', icon: Film },
+    { number: '5+', label: 'Years Experience', icon: Award },
   ];
 
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -79,22 +79,22 @@ export function AboutUs() {
 
   const timeline = [
     {
-      year: '2016',
+      year: '2020',
       title: 'The Beginning',
       description: 'Founded with a vision to revolutionize wedding photography in India.',
     },
     {
-      year: '2018',
+      year: '2023',
       title: 'Expansion',
       description: 'Grew our team and expanded services to cover all major cities.',
     },
     {
-      year: '2021',
+      year: '2024',
       title: 'AI Integration',
       description: 'Pioneered AI-powered face recognition for seamless photo delivery.',
     },
     {
-      year: '2024',
+      year: '2026',
       title: 'Industry Leaders',
       description: 'Recognized as one of India\'s top wedding media production houses.',
     },
@@ -172,7 +172,8 @@ export function AboutUs() {
         </div>
       </section>
 
-      {/* About Content */}
+      {/* About Content (temporarily hidden) */}
+      {false && (
       <section className="py-24 px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -253,8 +254,10 @@ export function AboutUs() {
           </div>
         </div>
       </section>
+      )}
 
-      {/* Team Section (moved up to stay visible right after About content) */}
+      {/* Team Section (temporarily hidden) */}
+      {false && (
       <section className="py-24 px-6 lg:px-8 bg-[#FAFAFA] dark:bg-[#0F0F0F]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
@@ -301,6 +304,7 @@ export function AboutUs() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Interactive Values Section */}
       <section className="py-24 px-6 lg:px-8 bg-[#FAFAFA] dark:bg-[#0F0F0F]">
