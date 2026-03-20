@@ -28,11 +28,11 @@ type DownloadJob = {
   message?: string;
 };
 
-let jsZipModulePromise: Promise<typeof import('jszip')> | null = null;
+let jsZipModulePromise: Promise<any> | null = null;
 
 const loadJSZip = async () => {
   if (!jsZipModulePromise) {
-    jsZipModulePromise = import('jszip');
+    jsZipModulePromise = import('jszip').then((mod: any) => mod.default || mod);
   }
   return jsZipModulePromise;
 };
@@ -67,7 +67,63 @@ export function EventDetail({ slug }: { slug?: string }) {
   const [isCoverImageLoaded, setIsCoverImageLoaded] = useState(false);
   const [didCoverImageFail, setDidCoverImageFail] = useState(false);
   const [lightboxImageLoading, setLightboxImageLoading] = useState(false);
+  const [preferCompressedImages, setPreferCompressedImages] = useState(false);
   const imagePreloadCache = useRef<Map<string, string>>(new Map());
+
+  const getAdaptivePhotoUrl = (photo?: Photo | null): string => {
+    if (!photo) return '';
+    return preferCompressedImages ? (photo.thumbnail || photo.url) : photo.url;
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const nav = navigator as Navigator & {
+      connection?: {
+        effectiveType?: string;
+        saveData?: boolean;
+        addEventListener?: (type: string, listener: () => void) => void;
+        removeEventListener?: (type: string, listener: () => void) => void;
+      };
+      mozConnection?: {
+        effectiveType?: string;
+        saveData?: boolean;
+        addEventListener?: (type: string, listener: () => void) => void;
+        removeEventListener?: (type: string, listener: () => void) => void;
+      };
+      webkitConnection?: {
+        effectiveType?: string;
+        saveData?: boolean;
+        addEventListener?: (type: string, listener: () => void) => void;
+        removeEventListener?: (type: string, listener: () => void) => void;
+      };
+      deviceMemory?: number;
+      hardwareConcurrency?: number;
+    };
+
+    const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
+
+    const evaluateImagePreference = () => {
+      const effectiveType = connection?.effectiveType || '';
+      const saveDataEnabled = Boolean(connection?.saveData);
+      const lowNetwork = saveDataEnabled || effectiveType === '2g' || effectiveType === 'slow-2g';
+      const lowSpecDevice =
+        (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 4) ||
+        (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 4);
+      const mobileViewport = window.matchMedia('(max-width: 768px)').matches;
+
+      setPreferCompressedImages(lowNetwork || (lowSpecDevice && mobileViewport));
+    };
+
+    evaluateImagePreference();
+    connection?.addEventListener?.('change', evaluateImagePreference);
+    window.addEventListener('resize', evaluateImagePreference);
+
+    return () => {
+      connection?.removeEventListener?.('change', evaluateImagePreference);
+      window.removeEventListener('resize', evaluateImagePreference);
+    };
+  }, []);
 
   const runDownloadJob = (label: string, task: (progress: (value: number) => void) => Promise<void>) => {
     const id = crypto.randomUUID();
@@ -605,7 +661,7 @@ export function EventDetail({ slug }: { slug?: string }) {
 
     toast.info(`Preparing ${selectedPhotos.size} photos for download...`, { duration: 2500 });
     runDownloadJob(`Downloading ${selectedPhotos.size} photos`, async (progress) => {
-      const { default: JSZip } = await loadJSZip();
+      const JSZip = await loadJSZip();
       const zip = new JSZip();
       const folder = zip.folder(event?.title || 'photos');
       if (!folder) throw new Error('Failed to create folder');
@@ -623,7 +679,7 @@ export function EventDetail({ slug }: { slug?: string }) {
         folder.file(filename, blob);
       }
 
-      const zipBlob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+      const zipBlob = await zip.generateAsync({ type: 'blob' }, (metadata: { percent: number }) => {
         progress(Math.min(100, 90 + (metadata.percent * 0.1)));
       });
 
@@ -646,6 +702,7 @@ export function EventDetail({ slug }: { slug?: string }) {
     ? eventPhotos.findIndex((p) => p.url === lightboxPhoto)
     : -1;
   const currentLightboxPhoto = currentPhotoIndex >= 0 ? eventPhotos[currentPhotoIndex] : null;
+  const currentLightboxSrc = getAdaptivePhotoUrl(currentLightboxPhoto) || lightboxPhoto || '';
 
   const nextPhoto = () => {
     if (currentPhotoIndex < eventPhotos.length - 1) {
@@ -668,13 +725,14 @@ export function EventDetail({ slug }: { slug?: string }) {
       for (let i = 1; i <= 3; i++) {
         if (currentPhotoIndex + i < eventPhotos.length) {
           const nextPhoto = eventPhotos[currentPhotoIndex + i];
-          if (!imagePreloadCache.current.has(nextPhoto.url)) {
+          const nextPhotoUrl = getAdaptivePhotoUrl(nextPhoto);
+          if (!imagePreloadCache.current.has(nextPhotoUrl)) {
             const img = new window.Image();
             img.addEventListener('load', () => {
               // Cache the image URL once loaded
-              imagePreloadCache.current.set(nextPhoto.url, nextPhoto.url);
+              imagePreloadCache.current.set(nextPhotoUrl, nextPhotoUrl);
             }, { once: true });
-            img.src = nextPhoto.url;
+            img.src = nextPhotoUrl;
           }
         }
       }
@@ -683,17 +741,18 @@ export function EventDetail({ slug }: { slug?: string }) {
       for (let i = 1; i <= 3; i++) {
         if (currentPhotoIndex - i >= 0) {
           const prevPhoto = eventPhotos[currentPhotoIndex - i];
-          if (!imagePreloadCache.current.has(prevPhoto.url)) {
+          const prevPhotoUrl = getAdaptivePhotoUrl(prevPhoto);
+          if (!imagePreloadCache.current.has(prevPhotoUrl)) {
             const img = new window.Image();
             img.addEventListener('load', () => {
-              imagePreloadCache.current.set(prevPhoto.url, prevPhoto.url);
+              imagePreloadCache.current.set(prevPhotoUrl, prevPhotoUrl);
             }, { once: true });
-            img.src = prevPhoto.url;
+            img.src = prevPhotoUrl;
           }
         }
       }
     }
-  }, [lightboxPhoto, currentPhotoIndex, eventPhotos]);
+  }, [lightboxPhoto, currentPhotoIndex, eventPhotos, preferCompressedImages]);
 
   // Keyboard navigation for lightbox
   useEffect(() => {
@@ -1559,8 +1618,8 @@ export function EventDetail({ slug }: { slug?: string }) {
                   <div className="rounded-lg overflow-hidden">
                     <ImageWithFallback
                       src={
-                        eventPhotos.find(p => p.id === selectedPhotoForComments)?.url ||
                         eventPhotos.find(p => p.id === selectedPhotoForComments)?.thumbnail ||
+                        eventPhotos.find(p => p.id === selectedPhotoForComments)?.url ||
                         ''
                       }
                       alt="Selected photo"
@@ -1688,28 +1747,31 @@ export function EventDetail({ slug }: { slug?: string }) {
               className="relative w-full h-full flex items-center justify-center px-4 py-8"
               onClick={(e) => e.stopPropagation()}
             >
-              {lightboxImageLoading && (
-                <img
-                  src={currentLightboxPhoto?.thumbnail || currentLightboxPhoto?.url || lightboxPhoto}
-                  alt="Loading preview"
-                  className="absolute max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg blur-sm opacity-70"
-                  loading="eager"
-                />
-              )}
+              <img
+                src={currentLightboxPhoto?.thumbnail || currentLightboxPhoto?.url || lightboxPhoto}
+                alt="Loading preview"
+                className={`absolute max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg transition-opacity duration-500 ease-out ${
+                  lightboxImageLoading ? 'opacity-100' : 'opacity-0'
+                }`}
+                loading="eager"
+              />
 
-              {/* Loading spinner */}
+              {/* Loading indicator kept away from photo center so content stays visible */}
               {lightboxImageLoading && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 md:top-3 md:bottom-auto z-[60] pointer-events-none">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs text-white backdrop-blur-md border border-white/20">
+                    <div className="w-3.5 h-3.5 border-2 border-white/35 border-t-white rounded-full animate-spin" />
+                    <span>Loading photo...</span>
+                  </div>
                 </div>
               )}
               
               {/* Full-size image - fits screen and allows scroll if needed */}
               <img
                 key={lightboxPhoto}
-                src={lightboxPhoto}
+                src={currentLightboxSrc}
                 alt="Full size"
-                className={`relative max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg transition-opacity duration-200 ${
+                className={`relative max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg transition-opacity duration-500 ease-out ${
                   lightboxImageLoading ? 'opacity-0' : 'opacity-100'
                 }`}
                 loading="eager"
