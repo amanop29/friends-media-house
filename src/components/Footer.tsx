@@ -15,7 +15,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { GlassCard } from "./GlassCard";
 import { toast } from "sonner";
-import { getSettings, getInstagramUrl, getYouTubeUrl, type SiteSettings } from "../lib/settings";
+import { fetchSettings, getSettings, getInstagramUrl, getYouTubeUrl, type SiteSettings } from "../lib/settings";
 
 // Flip Card Component for Contact Info
 function ContactFlipCard({
@@ -96,8 +96,14 @@ export function Footer() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Load settings only on client side to avoid hydration mismatch
-    setSettings(getSettings());
+    // Load local settings first for immediate render, then sync with Supabase.
+    const localSettings = getSettings();
+    setSettings(localSettings);
+
+    fetchSettings().then((supabaseSettings) => {
+      setSettings(supabaseSettings);
+    });
+
     setMounted(true);
 
     const handleScroll = () => {

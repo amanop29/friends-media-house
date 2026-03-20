@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToR2, isR2Available, getPresignedUploadUrl } from '@/lib/r2-storage';
+import { optimizeImageLosslessly } from '@/lib/lossless-image-optimizer';
 
 // GET /api/upload/public - Get presigned URL for public uploads
 export async function GET(request: NextRequest) {
@@ -96,7 +97,14 @@ export async function POST(request: NextRequest) {
 
     // Convert to buffer more efficiently
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const rawBuffer = Buffer.from(arrayBuffer);
+
+    const { buffer, contentType, optimized } = await optimizeImageLosslessly(rawBuffer, file.type);
+    if (optimized) {
+      console.log(
+        `🗜️ Lossless optimized ${file.name}: ${(rawBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(buffer.length / 1024 / 1024).toFixed(2)}MB`
+      );
+    }
 
     console.log(`Uploading ${file.name} (${(file.size / 1024).toFixed(1)}KB) to ${folder}`);
 
@@ -105,7 +113,7 @@ export async function POST(request: NextRequest) {
     const uploadResult = await uploadToR2(
       buffer,
       file.name,
-      file.type,
+      contentType,
       folder as any
     );
 

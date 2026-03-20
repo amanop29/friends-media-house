@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
-import { Save, Upload as UploadIcon, X, Image as ImageIcon, Lock, Eye, EyeOff, Loader2, Globe, ToggleLeft, ToggleRight, GripVertical } from 'lucide-react';
+import { Save, Upload as UploadIcon, X, Image as ImageIcon, Lock, Eye, EyeOff, Loader2, GripVertical } from 'lucide-react';
 import { GlassCard } from '../../components/GlassCard';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -33,7 +33,6 @@ export function Settings() {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
   const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
-  const [showLaunchPassword, setShowLaunchPassword] = useState<boolean>(false);
 
   useEffect(() => {
     // Load settings from localStorage first for immediate render
@@ -805,75 +804,6 @@ export function Settings() {
             </div>
           </GlassCard>
           
-          {/* Launch Page Settings */}
-          <GlassCard className="p-4 md:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C5A572] to-[#8B7355] flex items-center justify-center">
-                <Globe className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl text-[#2B2B2B] dark:text-white">Launch Page</h2>
-                <p className="text-sm text-gray-400 mt-0.5">Control the coming soon / countdown page</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {/* Enable / Disable Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 dark:bg-black/10 border border-white/10">
-                <div>
-                  <p className="text-[#2B2B2B] dark:text-white font-medium">Enable Launch Page</p>
-                  <p className="text-sm text-gray-400 mt-1">Redirects all visitors to the countdown page until disabled</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, launchPageEnabled: !formData.launchPageEnabled })}
-                  className="flex items-center gap-2 transition-colors"
-                >
-                  {formData.launchPageEnabled ? (
-                    <ToggleRight className="w-10 h-10 text-[#C5A572]" />
-                  ) : (
-                    <ToggleLeft className="w-10 h-10 text-gray-500" />
-                  )}
-                </button>
-              </div>
-
-              {/* Bypass Password */}
-              <div>
-                <label className="block text-[#2B2B2B] dark:text-white mb-1">Bypass Password</label>
-                <p className="text-sm text-gray-400 mb-3">Visitors who know this password can enter the site directly from the launch page</p>
-                <div className="relative">
-                  <Input
-                    type={showLaunchPassword ? 'text' : 'password'}
-                    value={formData.launchPagePassword || ''}
-                    onChange={(e) => setFormData({ ...formData, launchPagePassword: e.target.value })}
-                    placeholder="Enter bypass password"
-                    className="pr-12 rounded-lg bg-white/50 dark:bg-black/20 border-black/20 dark:border-white/10 focus:border-[#C5A572]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowLaunchPassword(!showLaunchPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                  >
-                    {showLaunchPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                disabled={isSaving}
-                onClick={handleSubmit as any}
-                className="bg-[#C5A572] hover:bg-[#B39563] text-white rounded-full px-8 gap-2"
-              >
-                {isSaving ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-                ) : (
-                  <><Save className="w-4 h-4" /> Save Launch Settings</>
-                )}
-              </Button>
-            </div>
-          </GlassCard>
-
           {/* Admin Credentials */}
           <GlassCard className="p-4 md:p-8">
             <div className="flex items-center gap-3 mb-6">

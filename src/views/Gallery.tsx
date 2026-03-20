@@ -48,6 +48,7 @@ export function Gallery() {
                 location: event.location,
                 category: actualCategory, // Use custom category if available
                 coverImage: event.cover_image || event.cover_image_url,
+                coverThumbnail: event.cover_thumbnail || event.cover_image,
                 coupleNames: event.couple_names,
                 photoCount: event.photo_count || 0,
                 videoCount: event.video_count || 0,
@@ -168,8 +169,8 @@ export function Gallery() {
           </div>
         ) : filteredEvents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
+            {filteredEvents.map((event, index) => (
+              <EventCard key={event.id} event={event} eager={index < 3} />
             ))}
           </div>
         ) : selectedCategory === 'all' ? (

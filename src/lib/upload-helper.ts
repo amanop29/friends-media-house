@@ -246,12 +246,16 @@ export async function uploadEventPhotoOriginalToR2(file: File): Promise<UploadRe
     // If presigned PUT was blocked (CORS not yet configured on the R2 bucket) fall back to the
     // server-POST path which proxies through Next.js and avoids CORS entirely.
     console.warn('[upload] Presigned PUT failed, retrying via server POST:', presignResult.error);
+
     // Vercel serverless functions cap request bodies at ~4.5 MB (FUNCTION_PAYLOAD_TOO_LARGE).
-    // Compress the image first so the server POST always stays under that limit.
+    // To keep processing strictly lossless, do not apply lossy client-side fallback compression.
     const VERCEL_SAFE_SIZE = 3 * 1024 * 1024; // 3 MB — comfortable margin below the 4.5 MB cap
     if (normalizedFile.size > VERCEL_SAFE_SIZE) {
-      console.log(`[upload] File (${(normalizedFile.size / 1024 / 1024).toFixed(1)} MB) too large for server POST — compressing before fallback`);
-      return await compressAndUploadImage(normalizedFile, 'events', 3);
+      return {
+        success: false,
+        error:
+          'Direct upload is unavailable and this file is too large for server fallback while preserving lossless quality. Please retry after enabling R2 CORS or use a smaller image.',
+      };
     }
     return await uploadToR2(normalizedFile, 'events');
   } catch (error) {
@@ -355,17 +359,8 @@ export async function uploadToR2(
   folder: 'banners' | 'logos' | 'avatars' | 'events' | 'gallery' | 'reviews' | 'videos' | 'team' = 'gallery'
 ): Promise<UploadResult> {
   try {
-    // Use presigned uploads only for larger files to avoid request timeouts and 413 errors.
-    // For event/gallery images, force server POST so thumbnails are generated at upload time.
-    const fourMB = 4 * 1024 * 1024;
-    const supportsThumbnailPipeline = folder === 'events' || folder === 'gallery';
-    const shouldUsePresignedUpload = file.size > fourMB && !supportsThumbnailPipeline;
-
-    if (shouldUsePresignedUpload) {
-      return uploadWithPresignedUrl(file, folder);
-    }
-
-    // For smaller files, use FormData with Sharp processing
+    // Keep image uploads on server POST so large files go through lossless optimization.
+    // Event/gallery still get thumbnails generated server-side.
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
@@ -422,126 +417,14 @@ export async function compressAndUploadImage(
   folder: 'banners' | 'logos' | 'avatars' | 'events' | 'gallery' | 'reviews' | 'videos' | 'team',
   maxSizeMB: number = 2
 ): Promise<UploadResult> {
-  // For very small files (< 500KB), upload directly without compression
-  const halfMB = 0.5 * 1024 * 1024;
-  if (file.size <= halfMB) {
-    console.log('File is small, uploading directly without compression');
-    return uploadToR2(file, folder);
+  const thresholdBytes = maxSizeMB * 1024 * 1024;
+  if (file.size > thresholdBytes) {
+    console.log(
+      `[upload] Large image detected (${(file.size / 1024 / 1024).toFixed(2)}MB). Using server-side lossless optimization.`
+    );
   }
 
-  // If file is reasonably sized, upload directly
-  if (file.size <= maxSizeMB * 1024 * 1024) {
-    console.log('File size acceptable, uploading without compression');
-    return uploadToR2(file, folder);
-  }
-
-  console.log('File is large, compressing before upload...');
-  
-  // Compress the image
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onerror = () => {
-      resolve({
-        success: false,
-        error: 'Failed to read image file',
-      });
-    };
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = () => {
-        resolve({
-          success: false,
-          error: 'Failed to load image',
-        });
-      };
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d', { 
-            alpha: false, // Faster rendering without alpha channel
-            willReadFrequently: false 
-          });
-          
-          if (!ctx) {
-            resolve({
-              success: false,
-              error: 'Failed to get canvas context',
-            });
-            return;
-          }
-          
-          // Calculate new dimensions - less aggressive for faster processing
-          const maxDimension = folder === 'banners' ? 1920 : 1200; // Increased from 800
-          let width = img.width;
-          let height = img.height;
-          
-          // Only resize if significantly larger
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              if (width > maxDimension) {
-                height *= maxDimension / width;
-                width = maxDimension;
-              }
-            } else {
-              if (height > maxDimension) {
-                width *= maxDimension / height;
-                height = maxDimension;
-              }
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          // Use better image smoothing for faster but decent quality
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'medium'; // Changed from default 'high'
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          // Convert to blob with better compression ratio for speed
-          canvas.toBlob(
-            async (blob) => {
-              if (!blob) {
-                resolve({
-                  success: false,
-                  error: 'Failed to compress image',
-                });
-                return;
-              }
-              
-              try {
-                const compressedFile = new File([blob], file.name, {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-                
-                console.log(`Compressed ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
-                
-                const result = await uploadToR2(compressedFile, folder);
-                resolve(result);
-              } catch (uploadError) {
-                console.error('Upload error during compression:', uploadError);
-                resolve({
-                  success: false,
-                  error: uploadError instanceof Error ? uploadError.message : 'Upload failed',
-                });
-              }
-            },
-            'image/jpeg',
-            0.85 // Slightly better quality (0.8 -> 0.85) for faster processing
-          );
-        } catch (canvasError) {
-          console.error('Canvas processing error:', canvasError);
-          resolve({
-            success: false,
-            error: 'Failed to process image',
-          });
-        }
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
+  return uploadToR2(file, folder);
 }
 
 /**

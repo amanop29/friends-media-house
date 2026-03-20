@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { uploadToR2, uploadToR2ByKey, isR2Available, getPresignedUploadUrl, getPresignedUrlForKey } from '@/lib/r2-storage';
+import { optimizeImageLosslessly } from '@/lib/lossless-image-optimizer';
 
 /**
  * Image upload endpoint with immutable object naming.
@@ -122,13 +123,20 @@ export async function POST(request: NextRequest) {
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const rawBuffer = Buffer.from(arrayBuffer);
+
+    const { buffer, contentType, optimized } = await optimizeImageLosslessly(rawBuffer, file.type);
+    if (optimized) {
+      console.log(
+        `🗜️ Lossless optimized ${file.name}: ${(rawBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(buffer.length / 1024 / 1024).toFixed(2)}MB`
+      );
+    }
 
     // Always upload original file for full-quality lightbox/downloads
     const uploadResult = await uploadToR2(
       buffer,
       file.name,
-      file.type,
+      contentType,
       folder as any
     );
 

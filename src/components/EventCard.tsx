@@ -12,9 +12,10 @@ import { formatEventType } from '../lib/utils';
 
 interface EventCardProps {
   event: Event;
+  eager?: boolean;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, eager = false }: EventCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const rawCategory = ((event as any).custom_category || (event as any).customCategory || event.category || '').toString().trim();
   const displayCategory = formatEventType(rawCategory);
@@ -52,10 +53,12 @@ export function EventCard({ event }: EventCardProps) {
               <div className="absolute inset-0 z-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 animate-shimmer bg-[length:200%_100%]" />
             )}
             <ImageWithFallback
-              src={event.coverImage}
+              src={event.coverThumbnail || event.coverImage}
               alt={event.title}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               onLoad={() => setImageLoaded(true)}
+              eager={eager}
+              fetchPriority={eager ? 'high' : 'auto'}
               fallback={eventCoverFallback}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />

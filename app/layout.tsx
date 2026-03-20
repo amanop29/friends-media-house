@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
 import NextTopLoader from 'nextjs-toploader';
-import SplashCursor from '@/components/SplashCursor';
+import { ConditionalSplashCursor } from '@/components/ConditionalSplashCursor';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { getHomeBannerUrls } from '@/lib/settings';
 import '@/styles/globals.css';
@@ -193,7 +193,7 @@ export default function RootLayout({
           shadow="0 0 10px #C5A572,0 0 5px #C5A572"
         />
         <ThemeProvider>
-          <SplashCursor />
+          <ConditionalSplashCursor />
           {children}
           <Toaster position="top-center" richColors />
           <SpeedInsights />

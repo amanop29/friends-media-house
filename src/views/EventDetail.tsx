@@ -17,7 +17,6 @@ import { getEvents, type Event } from '../lib/events-store';
 import { getPhotosByEvent, type Photo } from '../lib/photos-store';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import JSZip from 'jszip';
 
 type DownloadJobStatus = 'pending' | 'running' | 'success' | 'error';
 
@@ -27,6 +26,15 @@ type DownloadJob = {
   progress: number;
   status: DownloadJobStatus;
   message?: string;
+};
+
+let jsZipModulePromise: Promise<typeof import('jszip')> | null = null;
+
+const loadJSZip = async () => {
+  if (!jsZipModulePromise) {
+    jsZipModulePromise = import('jszip');
+  }
+  return jsZipModulePromise;
 };
 
 // Dynamic import for react-responsive-masonry to avoid SSR issues
@@ -58,6 +66,8 @@ export function EventDetail({ slug }: { slug?: string }) {
   const [downloadQueue, setDownloadQueue] = useState<DownloadJob[]>([]);
   const [isCoverImageLoaded, setIsCoverImageLoaded] = useState(false);
   const [didCoverImageFail, setDidCoverImageFail] = useState(false);
+  const [lightboxImageLoading, setLightboxImageLoading] = useState(false);
+  const imagePreloadCache = useRef<Map<string, string>>(new Map());
 
   const runDownloadJob = (label: string, task: (progress: (value: number) => void) => Promise<void>) => {
     const id = crypto.randomUUID();
@@ -595,6 +605,7 @@ export function EventDetail({ slug }: { slug?: string }) {
 
     toast.info(`Preparing ${selectedPhotos.size} photos for download...`, { duration: 2500 });
     runDownloadJob(`Downloading ${selectedPhotos.size} photos`, async (progress) => {
+      const { default: JSZip } = await loadJSZip();
       const zip = new JSZip();
       const folder = zip.folder(event?.title || 'photos');
       if (!folder) throw new Error('Failed to create folder');
@@ -646,6 +657,58 @@ export function EventDetail({ slug }: { slug?: string }) {
       setLightboxPhoto(eventPhotos[currentPhotoIndex - 1].url);
     }
   };
+
+  // Preload adjacent images for smooth navigation
+  useEffect(() => {
+    if (lightboxPhoto && currentPhotoIndex >= 0) {
+      // Preload next 3 images for faster navigation
+      for (let i = 1; i <= 3; i++) {
+        if (currentPhotoIndex + i < eventPhotos.length) {
+          const nextPhoto = eventPhotos[currentPhotoIndex + i];
+          if (!imagePreloadCache.current.has(nextPhoto.url)) {
+            const img = new window.Image();
+            img.addEventListener('load', () => {
+              // Cache the image URL once loaded
+              imagePreloadCache.current.set(nextPhoto.url, nextPhoto.url);
+            }, { once: true });
+            img.src = nextPhoto.url;
+          }
+        }
+      }
+      
+      // Preload previous 3 images
+      for (let i = 1; i <= 3; i++) {
+        if (currentPhotoIndex - i >= 0) {
+          const prevPhoto = eventPhotos[currentPhotoIndex - i];
+          if (!imagePreloadCache.current.has(prevPhoto.url)) {
+            const img = new window.Image();
+            img.addEventListener('load', () => {
+              imagePreloadCache.current.set(prevPhoto.url, prevPhoto.url);
+            }, { once: true });
+            img.src = prevPhoto.url;
+          }
+        }
+      }
+    }
+  }, [lightboxPhoto, currentPhotoIndex, eventPhotos]);
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!lightboxPhoto) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' && currentPhotoIndex < eventPhotos.length - 1) {
+        nextPhoto();
+      } else if (e.key === 'ArrowLeft' && currentPhotoIndex > 0) {
+        prevPhoto();
+      } else if (e.key === 'Escape') {
+        setLightboxPhoto(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxPhoto, currentPhotoIndex, eventPhotos]);
 
   const downloadImage = async (url: string, filename?: string, onProgress?: (value: number) => void) => {
     // Use the proxy endpoint to avoid CORS issues - API converts to JPG
@@ -1518,11 +1581,12 @@ export function EventDetail({ slug }: { slug?: string }) {
 
         {/* Lightbox */}
         {lightboxPhoto && (
-          <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setLightboxPhoto(null)}>
             {/* Top right buttons container */}
-            <div className="absolute top-4 right-4 flex items-center gap-3">
+            <div className="absolute top-4 right-4 flex items-center gap-3 z-50">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   const currentPhoto = eventPhotos[currentPhotoIndex];
                   if (currentPhoto) {
                     toggleLike(currentPhoto.id);
@@ -1548,7 +1612,8 @@ export function EventDetail({ slug }: { slug?: string }) {
               </button>
 
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   const currentPhoto = eventPhotos[currentPhotoIndex];
                   if (currentPhoto) {
                     setSelectedPhotoForComments(currentPhoto.id);
@@ -1566,7 +1631,10 @@ export function EventDetail({ slug }: { slug?: string }) {
               </button>
 
               <button
-                onClick={() => queueSingleImageDownload(lightboxPhoto, `photo-${Date.now()}.jpg`)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  queueSingleImageDownload(lightboxPhoto, `photo-${Date.now()}.jpg`);
+                }}
                 className="w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
                 title="Download Image"
               >
@@ -1574,17 +1642,24 @@ export function EventDetail({ slug }: { slug?: string }) {
               </button>
               
               <button
-                onClick={() => setLightboxPhoto(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxPhoto(null);
+                }}
                 className="w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
               >
                 <X className="w-6 h-6 text-white" />
               </button>
             </div>
 
+            {/* Navigation Buttons */}
             {currentPhotoIndex > 0 && (
               <button
-                onClick={prevPhoto}
-                className="absolute left-4 w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  prevPhoto();
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors z-50 hover:scale-110"
               >
                 <ChevronLeft className="w-6 h-6 text-white" />
               </button>
@@ -1592,18 +1667,40 @@ export function EventDetail({ slug }: { slug?: string }) {
 
             {currentPhotoIndex < eventPhotos.length - 1 && (
               <button
-                onClick={nextPhoto}
-                className="absolute right-4 w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nextPhoto();
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full backdrop-blur-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors z-50 hover:scale-110"
               >
                 <ChevronRight className="w-6 h-6 text-white" />
               </button>
             )}
 
-            <img
-              src={lightboxPhoto}
-              alt="Full size"
-              className="max-w-full max-h-full object-contain"
-            />
+            {/* Image Container - Scrollable */}
+            <div 
+              className="relative w-full h-full flex items-center justify-center px-4 py-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Loading spinner */}
+              {lightboxImageLoading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                </div>
+              )}
+              
+              {/* Full-size image - fits screen and allows scroll if needed */}
+              <img
+                src={lightboxPhoto}
+                alt="Full size"
+                className="relative max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg"
+                loading="eager"
+                decoding="async"
+                onLoad={() => setLightboxImageLoading(false)}
+                onLoadStart={() => setLightboxImageLoading(true)}
+                onError={() => setLightboxImageLoading(false)}
+              />
+            </div>
           </div>
         )}
       </div>

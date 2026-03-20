@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
       date: event.date,
       location: event.location,
       category: event.category,
-      coverImage: event.cover_image,
+      coverImage: event.cover_image || event.cover_image_url,
+      coverThumbnail: event.cover_thumbnail || event.cover_image,
       coupleNames: event.title, // Can be extracted from title or add separate field
       isFeatured: event.is_featured,
       isVisible: event.is_visible,
