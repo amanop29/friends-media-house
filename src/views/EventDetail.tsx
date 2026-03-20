@@ -75,6 +75,11 @@ export function EventDetail({ slug }: { slug?: string }) {
     return preferCompressedImages ? (photo.thumbnail || photo.url) : photo.url;
   };
 
+  const getLightboxFullResolutionUrl = (photo?: Photo | null): string => {
+    if (!photo) return '';
+    return photo.url;
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -702,7 +707,7 @@ export function EventDetail({ slug }: { slug?: string }) {
     ? eventPhotos.findIndex((p) => p.url === lightboxPhoto)
     : -1;
   const currentLightboxPhoto = currentPhotoIndex >= 0 ? eventPhotos[currentPhotoIndex] : null;
-  const currentLightboxSrc = getAdaptivePhotoUrl(currentLightboxPhoto) || lightboxPhoto || '';
+  const currentLightboxSrc = getLightboxFullResolutionUrl(currentLightboxPhoto) || lightboxPhoto || '';
 
   const nextPhoto = () => {
     if (currentPhotoIndex < eventPhotos.length - 1) {
@@ -725,7 +730,7 @@ export function EventDetail({ slug }: { slug?: string }) {
       for (let i = 1; i <= 3; i++) {
         if (currentPhotoIndex + i < eventPhotos.length) {
           const nextPhoto = eventPhotos[currentPhotoIndex + i];
-          const nextPhotoUrl = getAdaptivePhotoUrl(nextPhoto);
+          const nextPhotoUrl = getLightboxFullResolutionUrl(nextPhoto);
           if (!imagePreloadCache.current.has(nextPhotoUrl)) {
             const img = new window.Image();
             img.addEventListener('load', () => {
@@ -741,7 +746,7 @@ export function EventDetail({ slug }: { slug?: string }) {
       for (let i = 1; i <= 3; i++) {
         if (currentPhotoIndex - i >= 0) {
           const prevPhoto = eventPhotos[currentPhotoIndex - i];
-          const prevPhotoUrl = getAdaptivePhotoUrl(prevPhoto);
+          const prevPhotoUrl = getLightboxFullResolutionUrl(prevPhoto);
           if (!imagePreloadCache.current.has(prevPhotoUrl)) {
             const img = new window.Image();
             img.addEventListener('load', () => {
@@ -1758,10 +1763,10 @@ export function EventDetail({ slug }: { slug?: string }) {
 
               {/* Loading indicator kept away from photo center so content stays visible */}
               {lightboxImageLoading && (
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 md:top-3 md:bottom-auto z-[60] pointer-events-none">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs text-white backdrop-blur-md border border-white/20">
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 md:top-3 z-[60] pointer-events-none">
+                  <div className="inline-flex max-w-[78vw] items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs text-white backdrop-blur-md border border-white/20">
                     <div className="w-3.5 h-3.5 border-2 border-white/35 border-t-white rounded-full animate-spin" />
-                    <span>Loading photo...</span>
+                    <span className="text-center leading-tight whitespace-normal sm:whitespace-nowrap">Loading image to full resolution...</span>
                   </div>
                 </div>
               )}
