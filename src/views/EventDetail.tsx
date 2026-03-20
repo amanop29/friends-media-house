@@ -645,15 +645,18 @@ export function EventDetail({ slug }: { slug?: string }) {
   const currentPhotoIndex = lightboxPhoto
     ? eventPhotos.findIndex((p) => p.url === lightboxPhoto)
     : -1;
+  const currentLightboxPhoto = currentPhotoIndex >= 0 ? eventPhotos[currentPhotoIndex] : null;
 
   const nextPhoto = () => {
     if (currentPhotoIndex < eventPhotos.length - 1) {
+      setLightboxImageLoading(true);
       setLightboxPhoto(eventPhotos[currentPhotoIndex + 1].url);
     }
   };
 
   const prevPhoto = () => {
     if (currentPhotoIndex > 0) {
+      setLightboxImageLoading(true);
       setLightboxPhoto(eventPhotos[currentPhotoIndex - 1].url);
     }
   };
@@ -1041,6 +1044,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                         if (selectionMode) {
                           togglePhotoSelection(photo.id);
                         } else {
+                          setLightboxImageLoading(true);
                           setLightboxPhoto(photo.url);
                         }
                       }}
@@ -1162,6 +1166,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                         if (selectionMode) {
                           togglePhotoSelection(photo.id);
                         } else {
+                          setLightboxImageLoading(true);
                           setLightboxPhoto(photo.url);
                         }
                       }}
@@ -1309,6 +1314,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                           if (selectionMode) {
                             togglePhotoSelection(photo.id);
                           } else {
+                            setLightboxImageLoading(true);
                             setLightboxPhoto(photo.url);
                           }
                         }}
@@ -1593,7 +1599,7 @@ export function EventDetail({ slug }: { slug?: string }) {
                   }
                 }}
                 className={`h-12 px-4 rounded-full backdrop-blur-lg ${
-                  eventPhotos[currentPhotoIndex] && photoLikes.get(eventPhotos[currentPhotoIndex].id)?.isLiked
+                  currentLightboxPhoto && photoLikes.get(currentLightboxPhoto.id)?.isLiked
                     ? 'bg-red-500/80 hover:bg-red-600/80'
                     : 'bg-white/20 hover:bg-white/30'
                 } flex items-center justify-center gap-2 transition-colors`}
@@ -1601,13 +1607,13 @@ export function EventDetail({ slug }: { slug?: string }) {
               >
                 <Heart
                   className={`w-6 h-6 text-white ${
-                    eventPhotos[currentPhotoIndex] && photoLikes.get(eventPhotos[currentPhotoIndex].id)?.isLiked
+                    currentLightboxPhoto && photoLikes.get(currentLightboxPhoto.id)?.isLiked
                       ? 'fill-current'
                       : ''
                   }`}
                 />
                 <span className="text-white text-sm font-medium">
-                  {eventPhotos[currentPhotoIndex] ? (photoLikes.get(eventPhotos[currentPhotoIndex].id)?.count || 0) : 0}
+                  {currentLightboxPhoto ? (photoLikes.get(currentLightboxPhoto.id)?.count || 0) : 0}
                 </span>
               </button>
 
@@ -1626,7 +1632,7 @@ export function EventDetail({ slug }: { slug?: string }) {
               >
                 <MessageCircle className="w-6 h-6 text-white" />
                 <span className="text-white text-sm font-medium">
-                  {eventPhotos[currentPhotoIndex] ? (photoCommentCounts.get(eventPhotos[currentPhotoIndex].id) || 0) : 0}
+                  {currentLightboxPhoto ? (photoCommentCounts.get(currentLightboxPhoto.id) || 0) : 0}
                 </span>
               </button>
 
@@ -1682,6 +1688,15 @@ export function EventDetail({ slug }: { slug?: string }) {
               className="relative w-full h-full flex items-center justify-center px-4 py-8"
               onClick={(e) => e.stopPropagation()}
             >
+              {lightboxImageLoading && (
+                <img
+                  src={currentLightboxPhoto?.thumbnail || currentLightboxPhoto?.url || lightboxPhoto}
+                  alt="Loading preview"
+                  className="absolute max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg blur-sm opacity-70"
+                  loading="eager"
+                />
+              )}
+
               {/* Loading spinner */}
               {lightboxImageLoading && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1691,13 +1706,15 @@ export function EventDetail({ slug }: { slug?: string }) {
               
               {/* Full-size image - fits screen and allows scroll if needed */}
               <img
+                key={lightboxPhoto}
                 src={lightboxPhoto}
                 alt="Full size"
-                className="relative max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg"
+                className={`relative max-w-[95%] max-h-[calc(100vh-80px)] w-auto h-auto object-contain rounded-lg transition-opacity duration-200 ${
+                  lightboxImageLoading ? 'opacity-0' : 'opacity-100'
+                }`}
                 loading="eager"
                 decoding="async"
                 onLoad={() => setLightboxImageLoading(false)}
-                onLoadStart={() => setLightboxImageLoading(true)}
                 onError={() => setLightboxImageLoading(false)}
               />
             </div>
