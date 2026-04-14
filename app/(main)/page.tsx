@@ -23,7 +23,8 @@ export const metadata = {
   description: 'Professional event photography and videography services. Capturing your special moments with creativity and excellence.',
 };
 
-export const revalidate = 300;
+// Revalidate every 60 seconds so updated settings appear quickly
+export const revalidate = 60;
 
 async function getHomeInitialData(): Promise<{
   settings: SiteSettings;

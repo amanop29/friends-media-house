@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 
 /**
- * API endpoint to refresh Open Graph metadata
- * Call this after updating the home banner in admin panel
+ * API endpoint to refresh Open Graph metadata and homepage settings
+ * Call this after updating the home banner or settings in admin panel
  * 
  * Usage: POST /api/revalidate-og
  */
 export async function POST() {
   try {
-    // Revalidate the homepage to refresh OG image
+    // Revalidate the homepage to refresh OG image and settings immediately
+    revalidatePath('/(main)', 'page');
     revalidatePath('/', 'page');
     
     return NextResponse.json({

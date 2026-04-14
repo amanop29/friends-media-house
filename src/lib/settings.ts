@@ -145,12 +145,12 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
       } else {
         console.log('Settings synced to Supabase');
         
-        // Trigger OG metadata refresh if banner was updated
+        // Trigger page revalidation so updated settings appear immediately
         try {
           await fetch('/api/revalidate-og', { method: 'POST' });
-          console.log('Open Graph metadata refreshed');
+          console.log('Homepage revalidated with new settings');
         } catch (refreshError) {
-          console.warn('Failed to refresh OG metadata:', refreshError);
+          console.warn('Failed to revalidate homepage:', refreshError);
         }
       }
     }
