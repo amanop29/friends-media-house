@@ -10,20 +10,43 @@ interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElemen
 }
 
 export function ImageWithFallback(props: ImageWithFallbackProps) {
+  const initialSrc = typeof props.src === 'string' ? props.src : '';
+  const [currentSrc, setCurrentSrc] = useState(initialSrc)
   const [didError, setDidError] = useState(false)
+  const [didRetryViaProxy, setDidRetryViaProxy] = useState(false)
 
   const handleError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const source = typeof currentSrc === 'string' ? currentSrc : '';
+    const canRetryViaProxy =
+      !didRetryViaProxy &&
+      source.startsWith('http') &&
+      !source.startsWith('/api/image-proxy?url=');
+
+    if (canRetryViaProxy) {
+      setDidRetryViaProxy(true);
+      setCurrentSrc(`/api/image-proxy?url=${encodeURIComponent(source)}`);
+      return;
+    }
+
     setDidError(true)
     props.onError?.(event)
   }
 
   const { src, alt, style, className, onLoad, eager, loading, fallback, fetchPriority, ...rest } = props
 
+  // Keep internal source in sync when parent source changes.
+  React.useEffect(() => {
+    const nextSrc = typeof src === 'string' ? src : '';
+    setCurrentSrc(nextSrc);
+    setDidError(false);
+    setDidRetryViaProxy(false);
+  }, [src]);
+
   // Determine loading strategy - default to lazy unless eager is specified
   const loadingStrategy = eager ? 'eager' : (loading || 'lazy');
 
   // If src is empty or undefined, show error state immediately
-  if (!src) {
+  if (!currentSrc) {
     if (fallback) {
       return <>{fallback}</>
     }
@@ -55,7 +78,7 @@ export function ImageWithFallback(props: ImageWithFallbackProps) {
     )
   ) : (
     <img 
-      src={src} 
+      src={currentSrc} 
       alt={alt} 
       className={className} 
       style={style} 

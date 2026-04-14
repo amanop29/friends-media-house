@@ -7,7 +7,6 @@ import { getCategories, getCategoryDisplayName } from '../lib/categories-store';
 import { Button } from '../components/ui/button';
 import { EventCardSkeleton } from '../components/SkeletonComponents';
 import { NoEventsEmpty, NoSearchResultsEmpty } from '../components/EmptyStates';
-import { supabase } from '../lib/supabase';
 
 export function Gallery() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -23,48 +22,22 @@ export function Gallery() {
     const loadEvents = async () => {
       let loadedEvents: any[] = [];
       
-      // Try Supabase first
+      // Try server API first so client networks do not need direct Supabase access.
       try {
-        if (supabase) {
-          console.log('📡 Gallery: Fetching events from Supabase...');
-          const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .eq('is_visible', true)
-            .order('date', { ascending: false });
-          
-          if (!error && data && data.length > 0) {
-            console.log('✅ Gallery: Got', data.length, 'events from Supabase');
-            loadedEvents = data.map((event: any) => {
-              // Use custom_category from Supabase if available, otherwise use category enum
-              const actualCategory = event.custom_category || event.category;
-              
-              return {
-                id: event.id,
-                title: event.title,
-                slug: event.slug,
-                description: event.description,
-                date: event.date,
-                location: event.location,
-                category: actualCategory, // Use custom category if available
-                coverImage: event.cover_image || event.cover_image_url,
-                coverThumbnail: event.cover_thumbnail || event.cover_image,
-                coupleNames: event.couple_names,
-                photoCount: event.photo_count || 0,
-                videoCount: event.video_count || 0,
-                isFeatured: event.is_featured,
-                isVisible: event.is_visible,
-              };
-            });
-          } else {
-            console.warn('⚠️ Gallery: Supabase returned no events or error:', error);
-          }
+        console.log('📡 Gallery: Fetching events from API...');
+        const response = await fetch('/api/events/public', { cache: 'no-store' });
+        if (response.ok) {
+          const data = await response.json();
+          loadedEvents = Array.isArray(data?.events) ? data.events : [];
+          console.log('✅ Gallery: Got', loadedEvents.length, 'events from API');
+        } else {
+          console.warn('⚠️ Gallery: API responded with status', response.status);
         }
       } catch (err) {
-        console.error('❌ Gallery: Error fetching from Supabase:', err);
+        console.error('❌ Gallery: Error fetching from API:', err);
       }
       
-      // Fallback to localStorage if Supabase failed
+      // Fallback to localStorage if API failed
       if (loadedEvents.length === 0) {
         console.log('📂 Gallery: Falling back to localStorage...');
         loadedEvents = getEvents();

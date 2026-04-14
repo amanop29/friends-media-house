@@ -15,7 +15,6 @@ import { PhotoGridSkeleton } from '../components/SkeletonComponents';
 import { mockPhotoComments } from '../lib/mock-data';
 import { getEvents, type Event } from '../lib/events-store';
 import { getPhotosByEvent, type Photo } from '../lib/photos-store';
-import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
 type DownloadJobStatus = 'pending' | 'running' | 'success' | 'error';
@@ -266,63 +265,32 @@ export function EventDetail({ slug }: { slug?: string }) {
     // Load event and photos
     const loadEventAndPhotos = async () => {
       let currentEvent: Event | null = null;
+      let photos: Photo[] = [];
       
-      // Try Supabase first
+      // Try server API first so client networks do not need direct Supabase access.
       try {
-        if (supabase) {
-          console.log('📡 EventDetail: Fetching event from Supabase for slug/id:', id);
-          
-          // First try by slug
-          let query = supabase
-            .from('events')
-            .select('*')
-            .eq('slug', id)
-            .single();
-          
-          let result = await query;
-          
-          // If not found by slug, try by ID
-          if (result.error && result.error.code === 'PGRST116') {
-            console.log('📡 EventDetail: Not found by slug, trying by ID...');
-            query = supabase
-              .from('events')
-              .select('*')
-              .eq('id', id)
-              .single();
-            result = await query;
+        console.log('📡 EventDetail: Fetching event from API for slug/id:', id);
+        const response = await fetch(`/api/events/public/${encodeURIComponent(String(id))}`, {
+          cache: 'no-store',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          currentEvent = data?.event || null;
+          photos = Array.isArray(data?.photos) ? data.photos : [];
+          const videos = Array.isArray(data?.videos) ? data.videos : [];
+          if (currentEvent) {
+            currentEvent = { ...currentEvent, videos };
+            console.log('✅ EventDetail: Loaded event data from API');
           }
-          
-          const { data, error } = result;
-          
-          if (!error && data) {
-            console.log('✅ EventDetail: Got event from Supabase:', data.title);
-            currentEvent = {
-              id: data.id,
-              supabaseId: data.id,
-              title: data.title,
-              slug: data.slug,
-              description: data.description,
-              date: data.date,
-              location: data.location,
-              category: data.custom_category || data.category, // Use custom category if available
-              coverImage: data.cover_image || data.cover_image_url,
-              coupleNames: data.couple_names,
-              photoCount: data.photo_count || 0,
-              videoCount: data.video_count || 0,
-              isFeatured: data.is_featured,
-              isVisible: data.is_visible,
-              viewCount: data.view_count || 0,
-              videos: [], // Initialize empty, will be populated below
-            };
-          } else {
-            console.warn('⚠️ EventDetail: Supabase query failed:', error);
-          }
+        } else {
+          console.warn('⚠️ EventDetail: API responded with status', response.status);
         }
       } catch (err) {
-        console.error('❌ EventDetail: Error fetching from Supabase:', err);
+        console.error('❌ EventDetail: Error fetching from API:', err);
       }
       
-      // Fallback to localStorage if Supabase failed
+      // Fallback to localStorage if API failed
       if (!currentEvent) {
         console.log('📂 EventDetail: Falling back to localStorage...');
         const events = getEvents();
@@ -334,43 +302,7 @@ export function EventDetail({ slug }: { slug?: string }) {
         setDidCoverImageFail(false);
         setEvent(currentEvent);
         
-        // Get the Supabase event ID to query photos
-        const supabaseEventId = currentEvent.supabaseId || currentEvent.id;
-        
-        let photos: Photo[] = [];
-        
-        // Try to load photos from Supabase first
-        if (supabase) {
-          try {
-            console.log('📡 EventDetail: Fetching photos from Supabase for event:', supabaseEventId);
-            const { data: supabasePhotos, error } = await supabase
-              .from('photos')
-              .select('*')
-              .eq('event_id', supabaseEventId)
-              .order('created_at', { ascending: true });
-            
-            if (!error && supabasePhotos && supabasePhotos.length > 0) {
-              console.log('✅ EventDetail: Got', supabasePhotos.length, 'photos from Supabase');
-              photos = supabasePhotos.map((photo: any) => ({
-                id: photo.id,
-                supabasePhotoId: photo.id,
-                eventId: photo.event_id,
-                url: photo.url,
-                thumbnail: photo.thumbnail_url || photo.url,
-                width: photo.width,
-                height: photo.height,
-                orientation: photo.orientation,
-                likeCount: photo.like_count || 0,
-              }));
-            } else {
-              console.warn('⚠️ EventDetail: No photos in Supabase or error:', error);
-            }
-          } catch (err) {
-            console.error('❌ EventDetail: Error fetching photos from Supabase:', err);
-          }
-        }
-        
-        // Fallback to localStorage if Supabase returned nothing
+        // Fallback to localStorage if API returned no photos.
         if (photos.length === 0) {
           console.log('📂 EventDetail: Falling back to localStorage for photos...');
           photos = getPhotosByEvent(currentEvent.id);
@@ -384,116 +316,10 @@ export function EventDetail({ slug }: { slug?: string }) {
         const initialCommentsMap = new Map<string, number>();
         for (const photo of photos) {
           initialLikesMap.set(photo.id, { count: photo.likeCount || 0, isLiked: false });
-          initialCommentsMap.set(photo.id, 0);
+          initialCommentsMap.set(photo.id, (photo as any).commentCount || 0);
         }
         setPhotoLikes(initialLikesMap);
         setPhotoCommentCounts(initialCommentsMap);
-        
-        // Try to load like counts directly from Supabase photos table by event
-        if (supabase) {
-          try {
-            const { data: supabasePhotos, error } = await supabase
-              .from('photos')
-              .select('id, url, like_count')
-              .eq('event_id', supabaseEventId);
-            
-            if (!error && supabasePhotos && supabasePhotos.length > 0) {
-              // Match Supabase photos with local photos by URL or ID
-              const updatedLikesMap = new Map<string, { count: number; isLiked: boolean }>();
-              for (const photo of photos) {
-                // Try to find matching Supabase photo by supabasePhotoId, id, or url
-                const matchingSupabasePhoto = supabasePhotos.find((sp: { id: string; url: string; like_count: number }) => 
-                  sp.id === photo.supabasePhotoId || 
-                  sp.id === photo.id ||
-                  sp.url === photo.url
-                );
-                if (matchingSupabasePhoto) {
-                  updatedLikesMap.set(photo.id, { 
-                    count: matchingSupabasePhoto.like_count || 0, 
-                    isLiked: false 
-                  });
-                } else {
-                  updatedLikesMap.set(photo.id, { count: photo.likeCount || 0, isLiked: false });
-                }
-              }
-              setPhotoLikes(updatedLikesMap);
-            }
-          } catch (err) {
-            console.warn('Failed to fetch like counts from Supabase:', err);
-          }
-
-          // Load comment counts directly from Supabase
-          try {
-            const { data: comments, error } = await supabase
-              .from('photo_comments')
-              .select('photo_id')
-              .eq('is_hidden', false);
-            
-            if (!error && comments) {
-              // Count comments per photo
-              const commentCounts: Record<string, number> = {};
-              for (const comment of comments) {
-                commentCounts[comment.photo_id] = (commentCounts[comment.photo_id] || 0) + 1;
-              }
-              
-              // Match with local photos
-              const updatedCommentsMap = new Map<string, number>();
-              for (const photo of photos) {
-                const count = commentCounts[photo.supabasePhotoId || ''] || 
-                              commentCounts[photo.id] || 
-                              0;
-                updatedCommentsMap.set(photo.id, count);
-              }
-              setPhotoCommentCounts(updatedCommentsMap);
-            }
-          } catch (err) {
-            console.warn('Failed to fetch comment counts from Supabase:', err);
-          }
-        }
-
-        // Fetch videos from Supabase
-        if (supabase && currentEvent.supabaseId) {
-          try {
-            console.log('📹 EventDetail: Fetching videos from Supabase for event:', currentEvent.supabaseId);
-            const { data: supabaseVideos, error: videosError } = await supabase
-              .from('videos')
-              .select('*')
-              .eq('event_id', currentEvent.supabaseId)
-              .order('created_at', { ascending: true });
-            
-            if (!videosError && supabaseVideos && supabaseVideos.length > 0) {
-              console.log('✅ EventDetail: Got', supabaseVideos.length, 'videos from Supabase');
-              const videos = supabaseVideos.map((video: any) => ({
-                id: video.id,
-                url: video.url,
-                type: video.type || 'youtube',
-                thumbnail: video.thumbnail_url || '',
-                title: video.title || '',
-                uploadedAt: video.created_at || new Date().toISOString(),
-              }));
-              // Update the event with videos
-              currentEvent.videos = videos;
-              setEvent({ ...currentEvent, videos });
-            } else if (!videosError) {
-              console.log('📹 EventDetail: No videos found for event');
-              currentEvent.videos = [];
-            }
-          } catch (err) {
-            console.error('❌ EventDetail: Error fetching videos from Supabase:', err);
-          }
-        }
-
-        // Increment view count in Supabase (best effort)
-        if (currentEvent.supabaseId && supabase) {
-          try {
-            await supabase
-              .from('events')
-              .update({ view_count: (currentEvent.viewCount || 0) + 1 })
-              .eq('id', currentEvent.supabaseId);
-          } catch (err) {
-            console.warn('Failed to update view count:', err);
-          }
-        }
       } else {
         // Event not found
         console.warn('⚠️ Event not found for slug/id:', id);

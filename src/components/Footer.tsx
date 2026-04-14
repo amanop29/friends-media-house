@@ -379,7 +379,7 @@ export function Footer() {
               <span className="text-red-500">♥</span>
               {" "}by{" "}
               <a
-                href="https://www.streetfreak.in"
+                href="https://www.streetfreak.dev"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#C5A572] hover:text-[#C5A572]-200 hover:underline transition-colors"
