@@ -1,5 +1,4 @@
 import { Home } from '@/views/Home';
-import { cache } from 'react';
 import { DEFAULT_SETTINGS, type SiteSettings } from '@/lib/settings';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 
@@ -26,10 +25,10 @@ export const metadata = {
 
 export const revalidate = 300;
 
-const getHomeInitialData = cache(async (): Promise<{
+async function getHomeInitialData(): Promise<{
   settings: SiteSettings;
   featuredEvents: FeaturedEvent[];
-}> => {
+}> {
   const client = supabaseAdmin ?? supabase;
 
   if (!client || typeof client.from !== 'function') {
@@ -88,7 +87,7 @@ const getHomeInitialData = cache(async (): Promise<{
   }
 
   return { settings, featuredEvents };
-});
+}
 
 export default async function HomePage() {
   const { settings, featuredEvents } = await getHomeInitialData();
