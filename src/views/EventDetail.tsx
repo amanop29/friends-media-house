@@ -704,6 +704,29 @@ export function EventDetail({ slug }: { slug?: string }) {
 
   return (
     <div className="min-h-screen pt-32 pb-24 px-6 lg:px-8">
+      <style>{`
+        video::-webkit-media-controls-panel {
+          display: flex !important;
+        }
+        video:-webkit-full-screen {
+          width: 100vw !important;
+          height: 100vh !important;
+          object-fit: contain !important;
+          background: #000 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        video:fullscreen {
+          width: 100vw !important;
+          height: 100vh !important;
+          object-fit: contain !important;
+          background: #000 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+      `}</style>
       <div className="max-w-7xl mx-auto">
         {/* Event Header */}
         <motion.div
@@ -1302,25 +1325,36 @@ export function EventDetail({ slug }: { slug?: string }) {
               Cinematic Film{event.videos && event.videos.length > 1 ? 's' : ''}
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start justify-items-center md:justify-items-start">
               {/* New videos array */}
               {event.videos && event.videos.map((video: any) => (
-                <GlassCard key={video.id} className="overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
-                  <div className="aspect-video relative">
+                <GlassCard key={video.id} className="overflow-visible group hover:scale-[1.02] transition-transform duration-300 w-full max-w-[320px] md:max-w-[340px] lg:max-w-[360px] mx-auto md:mx-0">
+                  <div className="relative bg-black flex items-center justify-center" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', width: '100%' }}>
                     {video.type === 'youtube' ? (
-                      <iframe
-                        src={video.url}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        title={video.title || 'Wedding Video'}
-                      />
+                      <div className="flex items-center justify-center" style={{ width: '100%', aspectRatio: '16/9' }}>
+                        <iframe
+                          src={video.url}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={video.title || 'Wedding Video'}
+                          style={{ aspectRatio: '16/9' }}
+                        />
+                      </div>
                     ) : (
                       <video
                         src={video.url}
                         controls
+                        controlsList="nodownload"
                         poster={video.thumbnail}
-                        className="w-full h-full object-cover"
+                        style={{
+                          maxWidth: '100%',
+                          width: '100%',
+                          height: 'auto',
+                          maxHeight: '560px',
+                          objectFit: 'contain',
+                          display: 'block'
+                        }}
                       >
                         Your browser does not support the video tag.
                       </video>
@@ -1361,13 +1395,14 @@ export function EventDetail({ slug }: { slug?: string }) {
               {/* Legacy videoUrl for backwards compatibility */}
               {event.videoUrl && (!event.videos || event.videos.length === 0) && (
                 <GlassCard className="overflow-hidden">
-                  <div className="aspect-video">
+                  <div className="relative w-full bg-black flex items-center justify-center" style={{ maxHeight: '600px' }}>
                     <iframe
                       src={event.videoUrl}
-                      className="w-full h-full"
+                      className="w-full h-full object-contain"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
                       title="Wedding Video"
+                      style={{ maxWidth: '100%', maxHeight: '600px' }}
                     />
                   </div>
                 </GlassCard>
