@@ -1345,6 +1345,8 @@ export function EventDetail({ slug }: { slug?: string }) {
                       <video
                         src={video.url}
                         controls
+                        playsInline
+                        preload="metadata"
                         controlsList="nodownload"
                         poster={video.thumbnail}
                         style={{
