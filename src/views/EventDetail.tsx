@@ -1329,12 +1329,12 @@ export function EventDetail({ slug }: { slug?: string }) {
               {/* New videos array */}
               {event.videos && event.videos.map((video: any) => (
                 <GlassCard key={video.id} className="overflow-visible group hover:scale-[1.02] transition-transform duration-300 w-full max-w-[320px] md:max-w-[340px] lg:max-w-[360px] mx-auto md:mx-0">
-                  <div className="relative bg-black flex items-center justify-center" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', width: '100%' }}>
+                  <div className="relative bg-black flex items-center justify-center rounded-t-xl overflow-hidden" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', width: '100%' }}>
                     {video.type === 'youtube' ? (
                       <div className="flex items-center justify-center" style={{ width: '100%', aspectRatio: '16/9' }}>
                         <iframe
                           src={video.url}
-                          className="w-full h-full"
+                          className="w-full h-full block"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                           allowFullScreen
                           title={video.title || 'Wedding Video'}
