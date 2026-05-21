@@ -81,7 +81,13 @@ export function VideoManager({ videos, onChange, eventId }: VideoManagerProps) {
   };
 
   const handleVideoUpload = (file: File | null) => {
-    if (!file) return;
+    if (!file) {
+      setUploadedVideo(null);
+      setUploadedThumbnail(null);
+      setVideoFile(null);
+      setThumbnailFile(null);
+      return;
+    }
 
     if (!file.type.startsWith('video/')) {
       toast.error('Please select a valid video file');
@@ -123,7 +129,11 @@ export function VideoManager({ videos, onChange, eventId }: VideoManagerProps) {
   };
 
   const handleThumbnailUpload = async (file: File | null) => {
-    if (!file) return;
+    if (!file) {
+      setUploadedThumbnail(null);
+      setThumbnailFile(null);
+      return;
+    }
 
     if (!file.type.startsWith('image/')) {
       toast.error('Please select a valid image file');
@@ -404,11 +414,11 @@ export function VideoManager({ videos, onChange, eventId }: VideoManagerProps) {
                         </Label>
                         
                         {uploadedThumbnail && (
-                          <div className="mb-3 aspect-video rounded-lg overflow-hidden">
+                          <div className="mb-3 rounded-lg overflow-hidden bg-black/20 flex items-center justify-center">
                             <img
                               src={uploadedThumbnail}
                               alt="Video thumbnail"
-                              className="w-full h-full object-cover"
+                              className="max-w-full max-h-[320px] w-auto h-auto object-contain"
                             />
                           </div>
                         )}
@@ -466,11 +476,11 @@ export function VideoManager({ videos, onChange, eventId }: VideoManagerProps) {
               <GlassCard className="p-4">
                 <div className="space-y-3">
                   {/* Thumbnail */}
-                  <div className="aspect-video rounded-lg overflow-hidden bg-black/20 relative group">
+                  <div className="rounded-lg overflow-hidden bg-black/20 relative group flex items-center justify-center">
                     <img
                       src={video.thumbnail}
                       alt={video.title || 'Video thumbnail'}
-                      className="w-full h-full object-cover"
+                      className="max-w-full max-h-[180px] w-auto h-auto object-contain"
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       {video.type === 'youtube' && (
